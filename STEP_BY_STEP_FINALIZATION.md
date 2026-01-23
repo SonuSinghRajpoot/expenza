@@ -273,34 +273,53 @@ buildTypes {
 
 ### Step 5.1: Test Release APK on Physical Device
 
-1. Install release APK on a physical Android device:
+1. **Verify APK is ready:**
    ```bash
-   flutter install --release
+   Test-Path build\app\outputs\flutter-apk\app-release.apk
+   # Should return: True
    ```
-   Or manually install: `adb install build/app/outputs/flutter-apk/app-release.apk`
+   Current APK Size: **109.6 MB** ✅
 
-2. Test all major features:
-   - [ ] Create trip
-   - [ ] Add expense
-   - [ ] Scan bill with AI
-   - [ ] Export PDF
-   - [ ] Export Excel
-   - [ ] User profile management
-   - [ ] Share files from other apps
+2. **Install on device:**
+   ```bash
+   # Method 1: Using Flutter
+   flutter install --release
+   
+   # Method 2: Using ADB
+   adb install build/app/outputs/flutter-apk/app-release.apk
+   
+   # Method 3: Manual (copy APK to device and install)
+   ```
 
-**Status:** ⚠️ **TEST REQUIRED** - Before production release
+3. **Use Testing Checklist:**
+   - See `TESTING_CHECKLIST.md` for detailed feature testing
+   - See `TESTING_GUIDE.md` for comprehensive testing procedures
+
+**Status:** ⚠️ **TEST REQUIRED** - Use provided checklists for manual testing
 
 ---
 
 ### Step 5.2: Performance Testing
 
-Test with large datasets:
+**Use Testing Guide:**
+- See `TESTING_GUIDE.md` Section "Phase 5.2: Performance Testing"
+
+**Key Tests:**
 - [ ] Create 100+ expenses
 - [ ] Verify app performance
-- [ ] Check memory usage
+- [ ] Check memory usage (< 200MB)
 - [ ] Test export with many expenses
+- [ ] Test with large images
+- [ ] Verify no memory leaks
 
-**Status:** ⚠️ **TEST REQUIRED** - Verify performance
+**Performance Benchmarks:**
+- App Launch: < 2 seconds
+- Screen Navigation: < 300ms
+- List Scrolling: 60 FPS
+- PDF Export (50 expenses): < 30 seconds
+- Memory Usage: < 200MB
+
+**Status:** ⚠️ **TEST REQUIRED** - Follow testing guide procedures
 
 ---
 
@@ -348,11 +367,12 @@ version: 1.0.0+1  # Format: version+buildNumber
 - [x] Android keystore created ✅
 - [x] key.properties configured ✅
 - [x] build.gradle.kts updated with signing ✅
-- [x] Release APK tested ✅
+- [x] Release APK built ✅
 - [x] Release AAB built ✅
 - [x] Error handling improved ✅
+- [x] Testing guides and checklists created ✅
 - [ ] ProGuard rules added (optional)
-- [ ] Physical device testing complete
+- [ ] Physical device testing complete (use TESTING_CHECKLIST.md)
 - [ ] Play Store assets prepared
 
 ---
