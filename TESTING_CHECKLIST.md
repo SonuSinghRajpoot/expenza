@@ -43,12 +43,6 @@
   - [ ] Save changes works
   - [ ] Changes reflect in trip list
 
-- [ ] **Delete Trip**
-  - [ ] Delete button shows confirmation dialog
-  - [ ] Cancel button works
-  - [ ] Confirm deletion removes trip
-  - [ ] Related expenses handled correctly
-
 - [ ] **Submit Trip**
   - [ ] Submit button works
   - [ ] Trip moves to "Submitted" status

@@ -54,9 +54,6 @@ adb install build/app/outputs/flutter-apk/app-release.apk
 - [ ] Edit trip
   - [ ] Modify trip details
   - [ ] Save changes
-- [ ] Delete trip
-  - [ ] Confirm deletion dialog appears
-  - [ ] Trip removed from list
 - [ ] Submit trip
   - [ ] Trip moves to "Submitted" status
 - [ ] Reopen trip
