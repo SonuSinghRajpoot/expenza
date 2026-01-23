@@ -33,6 +33,10 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Exception: Include release build files
+!/build/app/outputs/flutter-apk/app-release.apk
+!/build/app/outputs/bundle/release/app-release.aab
+
 # Symbolication related
 app.*.symbols
 
