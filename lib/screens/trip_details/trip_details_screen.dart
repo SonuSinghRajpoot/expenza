@@ -25,6 +25,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/premium_icon.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../core/services/error_handler.dart';
 
 class TripDetailsScreen extends ConsumerStatefulWidget {
   final Trip trip;
@@ -315,7 +316,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                     child: Center(child: CircularProgressIndicator()),
                   ),
                   error: (err, stack) => SliverFillRemaining(
-                    child: Center(child: Text('Error loading advances: $err')),
+                    child: Center(child: Text(ErrorHandler.getUserFriendlyMessage(err))),
                   ),
                 );
               },
@@ -323,7 +324,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                 child: Center(child: CircularProgressIndicator()),
               ),
               error: (err, stack) => SliverFillRemaining(
-                child: Center(child: Text('Error: $err')),
+                child: Center(child: Text(ErrorHandler.getUserFriendlyMessage(err))),
               ),
             ),
             const SliverGap(80), // Space for FAB if needed
@@ -605,9 +606,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating state: $e')),
-          );
+          ErrorHandler.showError(context, e);
         }
       }
     }
@@ -776,9 +775,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error reopening trip: $e')));
+          ErrorHandler.showError(context, e);
         }
       }
     }
@@ -1121,12 +1118,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                   }
                 } catch (e) {
                   if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(
-                        content: Text('Error saving advance: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                    ErrorHandler.showError(ctx, e);
                   }
                 }
               },
@@ -1275,12 +1267,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                             }
                           } catch (e) {
                             if (ctx.mounted) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error deleting advance: $e'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
+                              ErrorHandler.showError(ctx, e);
                             }
                           }
                         }
@@ -1345,12 +1332,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                               }
                             } catch (e) {
                               if (ctx.mounted) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Error updating advance: $e'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
+                                ErrorHandler.showError(ctx, e);
                               }
                             }
                           },

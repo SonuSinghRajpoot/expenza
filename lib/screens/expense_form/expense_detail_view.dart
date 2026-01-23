@@ -9,6 +9,7 @@ import '../../models/trip.dart';
 import '../../providers/trip_provider.dart';
 import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/services/error_handler.dart';
 
 class ExpenseDetailViewScreen extends ConsumerStatefulWidget {
   final Expense expense;
@@ -574,12 +575,7 @@ class _ExpenseDetailViewScreenState
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error deleting expense: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ErrorHandler.showError(context, e);
         }
       }
     }

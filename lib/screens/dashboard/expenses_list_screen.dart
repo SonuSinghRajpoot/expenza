@@ -11,6 +11,7 @@ import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/premium_icon.dart';
+import '../../core/services/error_handler.dart';
 
 class ExpensesScreen extends ConsumerStatefulWidget {
   const ExpensesScreen({super.key});
@@ -164,7 +165,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
               child: Center(child: CircularProgressIndicator()),
             ),
             error: (err, stack) =>
-                SliverFillRemaining(child: Center(child: Text('Error: $err'))),
+                SliverFillRemaining(child: Center(child: Text(ErrorHandler.getUserFriendlyMessage(err)))),
           ),
         ],
       ),

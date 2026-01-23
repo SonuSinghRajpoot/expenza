@@ -15,6 +15,7 @@ import '../../services/gemini_service.dart';
 import '../../data/repositories/gemini_repository.dart';
 import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/services/error_handler.dart';
 
 class ExpenseFormScreen extends ConsumerStatefulWidget {
   final int tripId;
@@ -281,9 +282,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // Pop loader
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error analyzing bill: $e')));
+        ErrorHandler.showError(context, e);
       }
     }
   }
@@ -927,9 +926,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error deleting expense: $e')));
+          ErrorHandler.showError(context, e);
         }
       }
     }
@@ -1171,9 +1168,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error saving expense: $e')));
+          ErrorHandler.showError(context, e);
         }
       }
     }

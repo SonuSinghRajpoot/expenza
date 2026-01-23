@@ -6,6 +6,7 @@ import '../../models/gemini_key.dart';
 import '../../providers/gemini_provider.dart';
 import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/services/error_handler.dart';
 
 class ManageGeminiKeysDialog extends ConsumerStatefulWidget {
   const ManageGeminiKeysDialog({super.key});
@@ -229,7 +230,7 @@ class _ManageGeminiKeysDialogState
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      error: (e, _) => Center(child: Text(ErrorHandler.getUserFriendlyMessage(e))),
     );
   }
 
