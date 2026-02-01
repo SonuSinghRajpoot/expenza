@@ -16,6 +16,7 @@ import '../../data/repositories/gemini_repository.dart';
 import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/services/error_handler.dart';
+import '../../core/utils/permission_utils.dart';
 
 class ExpenseFormScreen extends ConsumerStatefulWidget {
   final int tripId;
@@ -262,9 +263,8 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
             } else if (_cityController.text.isNotEmpty) {
               _toCityController.text = _cityController.text;
             }
-            if (result['notes'] != null) {
-              _notesController.text = result['notes'];
-            }
+            _notesController.text =
+                GeminiService.buildNotesFromExtractedFields(result);
             if (result['pax'] != null) {
               _paxController.text = result['pax'].toString();
             }
@@ -1052,18 +1052,20 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
 
         final sameHead = e.head == expense.head;
         final sameSubHead = e.subHead == expense.subHead;
-        final sameAmount = e.amount == expense.amount;
+        // Use tolerance for currency (avoid floating-point equality issues)
+        final sameAmount = (e.amount - expense.amount).abs() < 0.01;
 
         final sameDate =
             e.startDate.year == expense.startDate.year &&
             e.startDate.month == expense.startDate.month &&
             e.startDate.day == expense.startDate.day;
 
-        final sameCity = e.city.toLowerCase() == expense.city.toLowerCase();
+        final sameCity = e.city.trim().toLowerCase() ==
+            expense.city.trim().toLowerCase();
 
         final sameToCity =
-            (e.toCity ?? '').toLowerCase() ==
-            (expense.toCity ?? '').toLowerCase();
+            (e.toCity ?? '').trim().toLowerCase() ==
+            (expense.toCity ?? '').trim().toLowerCase();
 
         return sameHead &&
             sameSubHead &&
@@ -1450,9 +1452,11 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
               icon: Icons.document_scanner_outlined,
               label: 'Smart Scan (Documents)',
               onTap: () async {
+                final granted = await PermissionUtils.requestCamera(context);
+                if (!granted) return;
                 Navigator.pop(ctx);
                 final paths = await ImageUtils.scanDocument(context);
-                if (paths.isNotEmpty) {
+                if (paths.isNotEmpty && mounted) {
                   setState(() => _billPaths.addAll(paths));
                 }
               },
@@ -1461,9 +1465,11 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
               icon: Icons.photo_library_outlined,
               label: 'Choose from Gallery',
               onTap: () async {
+                final granted = await PermissionUtils.requestGallery(context);
+                if (!granted) return;
                 Navigator.pop(ctx);
                 final paths = await ImageUtils.pickMultipleImagesFromGallery();
-                if (paths.isNotEmpty) {
+                if (paths.isNotEmpty && mounted) {
                   setState(() => _billPaths.addAll(paths));
                 }
               },
@@ -1472,9 +1478,11 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
               icon: Icons.picture_as_pdf_outlined,
               label: 'Upload PDF Document',
               onTap: () async {
+                final granted = await PermissionUtils.requestStorageForFiles(context);
+                if (!granted) return;
                 Navigator.pop(ctx);
                 final paths = await ImageUtils.pickPdfAndConvert();
-                if (paths.isNotEmpty) {
+                if (paths.isNotEmpty && mounted) {
                   setState(() => _billPaths.addAll(paths));
                 }
               },

@@ -188,6 +188,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const Gap(24),
                 _buildGeminiSection(context),
+                const Gap(24),
+                _buildDataStorageNotice(),
                 const Gap(40),
                 TextButton(
                   onPressed: () {},
@@ -371,6 +373,45 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ),
     ], onEdit: () => _showManageGeminiKeysDialog(context));
+  }
+
+  Widget _buildDataStorageNotice() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppDesign.itemBorderRadius),
+        border: Border.all(color: Colors.amber.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: Colors.amber.shade700, size: 22),
+          const Gap(12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Data storage',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Gap(4),
+                Text(
+                  'Your trips and expenses are stored locally. Clearing app data or storage in device settings will permanently delete all your data. Export your trips regularly to keep a backup.',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppDesign.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showManageGeminiKeysDialog(BuildContext context) {

@@ -149,19 +149,9 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
       barrierColor: Colors.black87,
       builder: (ctx) => AddExpenseOptionsDialog(
         heads: ExpenseConstants.heads,
-        onOptionSelected: (head, subHead, isAiScan) {
+        onOptionSelected: (head, subHead, isAiScan) async {
           if (isAiScan) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => ExpenseFormScreen(
-                  tripId: trip.id!,
-                  initialData: {
-                    'billPaths': filePaths,
-                    'autoAnalyze': true,
-                  },
-                ),
-              ),
-            );
+            await _navigateToExpenseFormWithAiScan(trip, filePaths);
           } else {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -177,6 +167,39 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
             );
           }
         },
+      ),
+    );
+  }
+
+  /// Converts shared PDFs to images and navigates to expense form with AI analysis.
+  /// Ensures parity with Add Expense button flow where PDFs are converted before AI.
+  Future<void> _navigateToExpenseFormWithAiScan(
+    Trip trip,
+    List<String> filePaths,
+  ) async {
+    // Convert PDFs to images so Gemini can analyze (same as Add Expense + PDF flow)
+    final pathsForAi = await ImageUtils.convertPdfPathsToImages(filePaths);
+    if (pathsForAi.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No valid images to analyze.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ExpenseFormScreen(
+          tripId: trip.id!,
+          initialData: {
+            'billPaths': pathsForAi,
+            'autoAnalyze': true,
+          },
+        ),
       ),
     );
   }

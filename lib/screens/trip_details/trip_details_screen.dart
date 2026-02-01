@@ -25,7 +25,9 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/premium_icon.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 import '../../core/services/error_handler.dart';
+import '../../core/utils/permission_utils.dart';
 
 class TripDetailsScreen extends ConsumerStatefulWidget {
   final Trip trip;
@@ -1395,6 +1397,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     }
 
     // Show selection dialog for AI Scan source
+    final parentContext = context;
     final List<String>? selectedPaths =
         await showModalBottomSheet<List<String>>(
           context: context,
@@ -1439,6 +1442,8 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                     style: AppTextStyles.bodyMedium,
                   ),
                   onTap: () async {
+                    final granted = await PermissionUtils.requestCamera(parentContext);
+                    if (!granted) return;
                     final paths = await ImageUtils.scanDocument(context);
                     if (ctx.mounted) Navigator.pop(ctx, paths);
                   },
@@ -1460,6 +1465,8 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                     style: AppTextStyles.bodyMedium,
                   ),
                   onTap: () async {
+                    final granted = await PermissionUtils.requestGallery(parentContext);
+                    if (!granted) return;
                     final paths =
                         await ImageUtils.pickMultipleImagesFromGallery();
                     if (ctx.mounted) Navigator.pop(ctx, paths);
@@ -1482,6 +1489,8 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                     style: AppTextStyles.bodyMedium,
                   ),
                   onTap: () async {
+                    final granted = await PermissionUtils.requestStorageForFiles(parentContext);
+                    if (!granted) return;
                     final paths = await ImageUtils.pickPdfAndConvert();
                     if (ctx.mounted) Navigator.pop(ctx, paths);
                   },
@@ -1533,11 +1542,13 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     if (!context.mounted) return;
     Navigator.pop(context); // Close loading dialog
 
-    // Add image paths to result so it can be shown in form
+    // Add image paths and built notes to result so it can be shown in form
     final initialData = result != null
         ? Map<String, dynamic>.from(result)
         : <String, dynamic>{};
     initialData['billPaths'] = selectedPaths;
+    initialData['notes'] =
+        GeminiService.buildNotesFromExtractedFields(initialData);
 
     if (!context.mounted) return;
     Navigator.push(

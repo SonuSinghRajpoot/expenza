@@ -1,9 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart';
-
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
 
 class DatabaseHelper {
@@ -23,8 +24,23 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, _dbName);
+    // Store DB in Expenza/db (alongside bills) for better persistence.
+    // This path is in application documents, not cache, so it survives "Clear cache".
+    // Note: "Clear data" still removes everything - export regularly to backup.
+    final appDoc = await getApplicationDocumentsDirectory();
+    final dbDir = Directory(join(appDoc.path, 'Expenza', 'db'));
+    if (!await dbDir.exists()) await dbDir.create(recursive: true);
+    final path = join(dbDir.path, _dbName);
+
+    // Migrate from old sqflite databases path if DB exists there and not in new location
+    if (!await File(path).exists()) {
+      final legacyDbPath = await getDatabasesPath();
+      final legacyPath = join(legacyDbPath, _dbName);
+      final legacyFile = File(legacyPath);
+      if (await legacyFile.exists()) {
+        await legacyFile.copy(path);
+      }
+    }
 
     // Ensure we have a secure encryption key
     String? password = await _secureStorage.read(key: _kDbPassKey);

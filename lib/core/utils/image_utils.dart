@@ -213,6 +213,24 @@ class ImageUtils {
     return imagePaths;
   }
 
+  /// Converts a list of paths to image paths. PDFs are converted to JPG images;
+  /// image paths are returned as-is. Use before sending to AI analysis (Gemini).
+  static Future<List<String>> convertPdfPathsToImages(List<String> paths) async {
+    if (kIsWeb) return paths;
+    final List<String> out = [];
+    for (final path in paths) {
+      if (path.isEmpty) continue;
+      final lower = path.toLowerCase();
+      if (lower.endsWith('.pdf')) {
+        final images = await convertPdfToImages(path);
+        out.addAll(images);
+      } else {
+        out.add(path);
+      }
+    }
+    return out;
+  }
+
   static Future<String?> _pickImageFromCameraWeb() async {
     try {
       final XFile? image = await _picker.pickImage(

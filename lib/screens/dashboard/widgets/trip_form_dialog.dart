@@ -246,16 +246,16 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                   ),
                 ),
               ),
-              const Gap(20),
+              const Gap(16),
               _buildFieldHeading('Locations (Multiple Allowed)'),
-              const Gap(8),
+              const Gap(6),
               Visibility(
                 visible: _selectedCities.isNotEmpty,
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: 4,
+                    runSpacing: 4,
                     children: _selectedCities
                         .map(
                           (c) => Chip(
@@ -263,15 +263,22 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                             label: Text(
                               c,
                               style: AppTextStyles.bodyMedium.copyWith(
-                                fontSize: 13,
+                                fontSize: 12,
                               ),
                             ),
                             onDeleted: () => _removeCity(c),
-                            deleteIcon: const Icon(Icons.close, size: 16),
+                            deleteIcon: const Icon(Icons.close, size: 14),
+                            deleteIconColor: AppDesign.textSecondary,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             backgroundColor: AppDesign.primary.withValues(alpha: 0.1),
                             side: BorderSide.none,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppDesign.smallBorderRadius),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                           ),
                         )
@@ -298,7 +305,7 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                     ),
                 textCapitalization: TextCapitalization.words,
               ),
-              const Gap(8),
+              const Gap(6),
               Visibility(
                 visible: filteredSuggestions.isNotEmpty,
                 maintainState: true,
@@ -306,7 +313,10 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                   width: double.infinity,
                   child: Container(
                     key: const ValueKey('city_suggestions_container'),
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
                     decoration: AppDesign.cardDecoration(
                       borderRadius: AppDesign.buttonBorderRadius,
                     ),
@@ -315,16 +325,17 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Select Locations from previously added trips',
+                          'Select from previous trips',
                           style: AppTextStyles.bodySmall.copyWith(
                             fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3,
+                            fontSize: 11,
+                            letterSpacing: 0.2,
                           ),
                         ),
-                        const Gap(6),
+                        const Gap(4),
                         Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
+                          spacing: 4,
+                          runSpacing: 4,
                           children: filteredSuggestions.map((city) {
                             return ActionChip(
                               key: ValueKey('suggestion_$city'),
@@ -338,12 +349,14 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                               backgroundColor: AppDesign.surfaceElevated,
                               side: const BorderSide(color: AppDesign.borderDefault),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(AppDesign.smallBorderRadius),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
+                                horizontal: 6,
+                                vertical: 2,
                               ),
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
                             );
                           }).toList(),
                         ),
