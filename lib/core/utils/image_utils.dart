@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image/image.dart' as img;
 import 'package:pdfx/pdfx.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -18,6 +19,63 @@ class ImageUtils {
     final dir = Directory('${base.path}/Expenza/bills');
     if (!await dir.exists()) await dir.create(recursive: true);
     return dir;
+  }
+
+  static String _normalizeLocalPath(String path) {
+    if (path.isEmpty) return path;
+    if (path.startsWith('file://')) {
+      try {
+        return Uri.parse(path).toFilePath();
+      } catch (_) {
+        return path;
+      }
+    }
+    return path;
+  }
+
+  static Future<String?> _persistImageBytesToBillsDir(
+    Uint8List bytes, {
+    String extension = '.jpg',
+  }) async {
+    if (kIsWeb) return null;
+    if (bytes.isEmpty) return null;
+
+    try {
+      final dir = await _billsDirectory();
+      final safeExt = extension.isNotEmpty ? extension : '.jpg';
+      final name =
+          'bill_${DateTime.now().millisecondsSinceEpoch}_${const Uuid().v4().toString().substring(0, 8)}$safeExt';
+      final dest = File('${dir.path}/$name');
+      await dest.writeAsBytes(bytes, flush: true);
+      return dest.path;
+    } catch (e) {
+      debugPrint('Error persisting image bytes to bills dir: $e');
+      return null;
+    }
+  }
+
+  static Future<String?> _persistXFileToBillsDir(XFile xfile) async {
+    if (kIsWeb) return xfile.path;
+    try {
+      final bytes = await xfile.readAsBytes();
+      if (bytes.isEmpty) return null;
+      // Try to normalize to JPEG for maximum compatibility (PDF export, sharing, etc.)
+      final decoded = img.decodeImage(bytes);
+      if (decoded != null) {
+        final jpgBytes = Uint8List.fromList(img.encodeJpg(decoded, quality: 85));
+        return await _persistImageBytesToBillsDir(jpgBytes, extension: '.jpg');
+      }
+
+      // Fallback: persist raw bytes with best-effort extension.
+      final ext = p.extension(xfile.path).toLowerCase();
+      return await _persistImageBytesToBillsDir(
+        bytes,
+        extension: ext.isNotEmpty ? ext : '.jpg',
+      );
+    } catch (e) {
+      debugPrint('Error persisting XFile to bills dir: $e');
+      return null;
+    }
   }
 
   /// Copies file paths to the persistent bills directory. Use for shared intents etc.
@@ -39,19 +97,39 @@ class ImageUtils {
   static Future<String> _copyToBillsDir(String sourcePath) async {
     if (kIsWeb) return sourcePath;
     try {
-      final f = File(sourcePath);
+      final normalized = _normalizeLocalPath(sourcePath);
+      if (normalized.startsWith('content://')) {
+        // Can't be read using dart:io File. Keep as-is; callers should prefer XFile persistence.
+        debugPrint('Unsupported content URI path (cannot persist): $normalized');
+        return sourcePath;
+      }
+
+      final f = File(normalized);
       if (!await f.exists()) return sourcePath;
       
       final dir = await _billsDirectory();
       
       // Check if the file is already in the persistent bills directory
-      if (sourcePath.startsWith(dir.path)) {
+      if (normalized.startsWith(dir.path)) {
         // File is already in persistent storage, return as-is
-        return sourcePath;
+        return normalized;
       }
       
-      // File is not in persistent storage, copy it
-      final ext = p.extension(sourcePath);
+      // File is not in persistent storage; read bytes and (when possible) re-encode to JPEG
+      final ext = p.extension(normalized).toLowerCase();
+      final rawBytes = await f.readAsBytes();
+      if (rawBytes.isEmpty) return sourcePath;
+
+      // Try to decode using the `image` package (supports many formats like PNG/JPEG/WebP).
+      // If decoding fails, fall back to raw copy.
+      final decoded = img.decodeImage(rawBytes);
+      if (decoded != null) {
+        final jpgBytes = Uint8List.fromList(img.encodeJpg(decoded, quality: 85));
+        final destPath = await _persistImageBytesToBillsDir(jpgBytes, extension: '.jpg');
+        if (destPath != null) return destPath;
+      }
+
+      // Fallback: raw copy with original extension (or .jpg if unknown)
       final name =
           'bill_${DateTime.now().millisecondsSinceEpoch}_${const Uuid().v4().toString().substring(0, 8)}${ext.isNotEmpty ? ext : '.jpg'}';
       final dest = File('${dir.path}/$name');
@@ -74,6 +152,13 @@ class ImageUtils {
       if (kIsWeb) return images.map((e) => e.path).toList();
       final List<String> out = [];
       for (final x in images) {
+        // Prefer persisting via bytes (more robust than copying temp paths on some platforms)
+        final persisted = await _persistXFileToBillsDir(x);
+        if (persisted != null && persisted.isNotEmpty) {
+          out.add(persisted);
+          continue;
+        }
+
         final s = x.path;
         if (s.isEmpty) continue;
         out.add(await _copyToBillsDir(s));
@@ -89,13 +174,17 @@ class ImageUtils {
   static Future<List<String>> scanDocument(BuildContext context) async {
     // WEB FALLBACK: Camera Picker (blob path, no copy)
     if (kIsWeb) {
-      final path = await _pickImageFromCameraWeb();
-      return path != null ? [path] : [];
+      final x = await _pickImageFromCamera();
+      return x != null ? [x.path] : [];
     }
 
     if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-      final path = await _pickImageFromCameraWeb();
-      if (path != null) return [await _copyToBillsDir(path)];
+      final x = await _pickImageFromCamera();
+      if (x != null) {
+        final persisted = await _persistXFileToBillsDir(x);
+        if (persisted != null) return [persisted];
+        return [await _copyToBillsDir(x.path)];
+      }
       return [];
     }
 
@@ -115,8 +204,12 @@ class ImageUtils {
       return out;
     } catch (e) {
       debugPrint('Error scanning document: $e');
-      final path = await _pickImageFromCameraWeb();
-      if (path != null) return [await _copyToBillsDir(path)];
+      final x = await _pickImageFromCamera();
+      if (x != null) {
+        final persisted = await _persistXFileToBillsDir(x);
+        if (persisted != null) return [persisted];
+        return [await _copyToBillsDir(x.path)];
+      }
       return [];
     }
   }
@@ -231,7 +324,7 @@ class ImageUtils {
     return out;
   }
 
-  static Future<String?> _pickImageFromCameraWeb() async {
+  static Future<XFile?> _pickImageFromCamera() async {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
@@ -239,7 +332,7 @@ class ImageUtils {
         maxWidth: 1024,
         maxHeight: 1024,
       );
-      return image?.path;
+      return image;
     } catch (e) {
       debugPrint('Error accessing camera: $e');
       return null;

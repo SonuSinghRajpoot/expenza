@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:image/image.dart' as img;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -16,6 +17,18 @@ class ExportService {
   static final ExportService _instance = ExportService._internal();
   factory ExportService() => _instance;
   ExportService._internal();
+
+  String _normalizeLocalPath(String path) {
+    if (path.isEmpty) return path;
+    if (path.startsWith('file://')) {
+      try {
+        return Uri.parse(path).toFilePath();
+      } catch (_) {
+        return path;
+      }
+    }
+    return path;
+  }
 
   /// Returns the path to the saved file, or null for web
   Future<String?> exportToExcel(
@@ -1805,14 +1818,26 @@ class ExportService {
       final displayId = expenseIndex + 1;
       if (expense.billPaths.isNotEmpty) {
         for (var j = 0; j < expense.billPaths.length; j++) {
-          final path = expense.billPaths[j];
+          final originalPath = expense.billPaths[j];
+          final path = _normalizeLocalPath(originalPath);
           try {
             final File imageFile = File(path);
             if (await imageFile.exists()) {
               final imageBytes = await imageFile.readAsBytes();
               if (imageBytes.isNotEmpty) {
                 try {
-                  final image = pw.MemoryImage(imageBytes);
+                  late final pw.MemoryImage image;
+                  try {
+                    // Fast path for supported formats (typically JPEG/PNG)
+                    image = pw.MemoryImage(imageBytes);
+                  } catch (e) {
+                    // Fallback: decode using `image` package and re-encode to JPEG.
+                    // This helps when camera/scanner produces WebP/other formats the PDF lib can't decode.
+                    final decoded = img.decodeImage(imageBytes);
+                    if (decoded == null) rethrow;
+                    final jpgBytes = img.encodeJpg(decoded, quality: 85);
+                    image = pw.MemoryImage(Uint8List.fromList(jpgBytes));
+                  }
                   pdf.addPage(
                     pw.Page(
                       pageFormat: PdfPageFormat.a4,
@@ -1891,17 +1916,17 @@ class ExportService {
                     ),
                   );
                 } catch (imageError) {
-                  debugPrint('Error creating PDF image from file $path: $imageError');
+                  debugPrint('Error creating PDF image from file $originalPath (normalized: $path): $imageError');
                   // Continue to next image instead of failing completely
                 }
               } else {
-                debugPrint('Image file $path is empty');
+                debugPrint('Image file $originalPath (normalized: $path) is empty');
               }
             } else {
-              debugPrint('Image file $path does not exist');
+              debugPrint('Image file $originalPath (normalized: $path) does not exist');
             }
           } catch (e) {
-            debugPrint('Error processing image file $path: $e');
+            debugPrint('Error processing image file $originalPath (normalized: $path): $e');
             // Continue to next image instead of failing completely
           }
         }
