@@ -53,7 +53,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 9,
+      version: 10, // Bumped to 10 to include notes migration
       password: password, // SQLCipher encryption
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
@@ -96,6 +96,13 @@ class DatabaseHelper {
     }
     if (oldVersion < 9) {
       await _createAdvancesTable(db);
+    }
+    if (oldVersion < 10) {
+      try {
+        await db.execute('ALTER TABLE expenses ADD COLUMN notes TEXT');
+      } catch (e) {
+        // Ignore if column already exists (e.g. from fresh install of v9)
+      }
     }
   }
 

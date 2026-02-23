@@ -13,6 +13,7 @@ import '../screens/expense_form/add_expense_options_dialog.dart';
 import '../core/constants/expense_constants.dart';
 import '../core/theme/app_design.dart';
 import '../core/utils/image_utils.dart';
+import '../core/utils/permission_utils.dart';
 
 class SharingListener extends ConsumerStatefulWidget {
   final Widget child;
@@ -25,6 +26,7 @@ class SharingListener extends ConsumerStatefulWidget {
 
 class _SharingListenerState extends ConsumerState<SharingListener> {
   StreamSubscription? _intentDataStreamSubscription;
+  bool _launchPermissionsRequested = false;
 
   @override
   void initState() {
@@ -204,8 +206,17 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
     );
   }
 
+  void _requestLaunchPermissions() {
+    if (_launchPermissionsRequested) return;
+    _launchPermissionsRequested = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PermissionUtils.requestLaunchPermissions();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    _requestLaunchPermissions();
     return widget.child;
   }
 }

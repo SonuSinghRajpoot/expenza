@@ -296,6 +296,22 @@ class TripRepository {
     );
   }
 
+  /// Deletes a trip. Only call when the trip has no expenses (caller must verify).
+  Future<void> deleteTrip(int id) async {
+    if (kIsWeb) {
+      await _ensureInitialized();
+      _mockAdvances.removeWhere((a) => a.tripId == id);
+      _mockExpenses.removeWhere((e) => e.tripId == id);
+      _mockTrips.removeWhere((t) => t.id == id);
+      await _saveMockData();
+      return;
+    }
+    final db = await _dbHelper.database;
+    await db.delete('advances', where: 'trip_id = ?', whereArgs: [id]);
+    await db.delete('expenses', where: 'trip_id = ?', whereArgs: [id]);
+    await db.delete('trips', where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<void> archiveTrip(int id) async {
     if (kIsWeb) {
       await _ensureInitialized();

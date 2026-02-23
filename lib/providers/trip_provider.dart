@@ -43,6 +43,15 @@ class TripListNotifier extends AsyncNotifier<List<Trip>> {
     });
   }
 
+  Future<void> deleteTrip(int tripId) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      final repository = ref.read(tripRepositoryProvider);
+      await repository.deleteTrip(tripId);
+      return repository.getTrips();
+    });
+  }
+
   Future<void> archiveTrip(int tripId) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {

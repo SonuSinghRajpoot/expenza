@@ -36,8 +36,12 @@
 
 ```powershell
 cd d:\Projects\Expenses
-flutter build apk --release
+# Optional: include rollout timestamp (shown in Profile > App Version)
+$timestamp = Get-Date -Format "yyyy-MM-dd HH:mm"
+flutter build apk --release --dart-define=BUILD_TIMESTAMP=$timestamp
 ```
+
+Or without timestamp: `flutter build apk --release`
 
 Output: `build\app\outputs\flutter-apk\app-release.apk`
 

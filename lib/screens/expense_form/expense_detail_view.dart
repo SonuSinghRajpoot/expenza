@@ -7,6 +7,7 @@ import 'package:gap/gap.dart';
 import '../../models/expense.dart';
 import '../../models/trip.dart';
 import '../../providers/trip_provider.dart';
+import '../../core/constants/expense_icons.dart';
 import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/services/error_handler.dart';
@@ -158,7 +159,7 @@ class _ExpenseDetailViewScreenState
 
   Widget _buildHeaderCard(Expense expense) {
     final categoryColor = _getCategoryColor(expense.head);
-    final categoryIcon = _getCategoryIcon(expense.head);
+    final categoryIcon = getExpenseIcon(expense.head, expense.subHead);
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -517,23 +518,6 @@ class _ExpenseDetailViewScreenState
         return AppDesign.categoryMisc;
       default:
         return AppDesign.categoryMisc;
-    }
-  }
-
-  IconData _getCategoryIcon(String head) {
-    switch (head) {
-      case 'Travel':
-        return Icons.directions_car_outlined;
-      case 'Accommodation':
-        return Icons.hotel_outlined;
-      case 'Food':
-        return Icons.restaurant_outlined;
-      case 'Event':
-        return Icons.event_outlined;
-      case 'Miscellaneous':
-        return Icons.receipt_outlined;
-      default:
-        return Icons.receipt_outlined;
     }
   }
 

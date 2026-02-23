@@ -4,6 +4,7 @@ import 'package:gap/gap.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../providers/gemini_provider.dart';
 import '../../core/constants/expense_constants.dart';
+import '../../core/constants/expense_icons.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/premium_icon.dart';
 import '../../core/theme/app_design.dart';
@@ -47,12 +48,17 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
         vertical: AppDesign.screenVerticalPadding,
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDesign.cardBorderRadius)),
-      child: Padding(
-        padding: EdgeInsets.all(AppDesign.screenHorizontalPadding * 2),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(AppDesign.screenHorizontalPadding * 2),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
             Text(
               'Add Expense',
               style: AppTextStyles.headline2,
@@ -226,6 +232,8 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
           ],
         ),
       ),
+    ),
+  ),
     );
   }
 
@@ -364,6 +372,9 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
   Widget _buildSubHeadButton(BuildContext context, String subHead) {
     final isSelected = _selectedSubHead == subHead;
     final primaryColor = AppDesign.primary;
+    final icon = _selectedHead != null
+        ? getExpenseIcon(_selectedHead!, subHead)
+        : Icons.receipt_outlined;
 
     return InkWell(
       onTap: () {
@@ -374,46 +385,40 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
         Navigator.pop(context);
         widget.onOptionSelected(_selectedHead, subHead, false);
       },
-                      borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+      borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? primaryColor
-              : Colors.white,
+          color: isSelected ? primaryColor : Colors.white,
           border: Border.all(
-            color: isSelected
-                ? primaryColor
-                : Colors.grey.shade300,
+            color: isSelected ? primaryColor : Colors.grey.shade300,
             width: isSelected ? 2 : 1,
           ),
-                      borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+          borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
         ),
-        child: Text(
-          subHead,
-          style: AppTextStyles.bodyMedium.copyWith(
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? Colors.white : AppDesign.textPrimary,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.blueGrey,
+            ),
+            const Gap(8),
+            Text(
+              subHead,
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? Colors.white : AppDesign.textPrimary,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   IconData _getCategoryIcon(String head) {
-    switch (head) {
-      case 'Travel':
-        return Icons.directions_car_outlined;
-      case 'Accommodation':
-        return Icons.hotel_outlined;
-      case 'Food':
-        return Icons.restaurant_outlined;
-      case 'Event':
-        return Icons.palette_outlined;
-      case 'Miscellaneous':
-        return Icons.receipt_outlined;
-      default:
-        return Icons.receipt_outlined;
-    }
+    return getExpenseIcon(head, null);
   }
 }

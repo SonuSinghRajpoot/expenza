@@ -376,7 +376,7 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
         ),
         FilledButton(
           onPressed: () {
-            if (_nameController.text.isNotEmpty && _selectedCities.isNotEmpty) {
+            if (_nameController.text.isNotEmpty) {
               final trip =
                   (widget.trip ??
                           Trip(

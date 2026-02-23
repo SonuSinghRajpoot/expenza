@@ -1041,6 +1041,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
         billPaths: persistentBillPaths,
         notes: _notesController.text,
         createdAt: widget.expense?.createdAt ?? DateTime.now(),
+        displayOrder: widget.expense?.displayOrder,
       );
 
       // Check for Duplicates
@@ -1450,25 +1451,14 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
             const Gap(16),
             _buildPickerOption(
               icon: Icons.document_scanner_outlined,
-              label: 'Smart Scan (Documents)',
+              label: 'Smart Scan (Camera or Gallery)',
               onTap: () async {
-                final granted = await PermissionUtils.requestCamera(context);
-                if (!granted) return;
+                final cameraGranted = await PermissionUtils.requestCamera(context);
+                if (!cameraGranted) return;
+                final galleryGranted = await PermissionUtils.requestGallery(context);
+                if (!galleryGranted) return;
                 Navigator.pop(ctx);
                 final paths = await ImageUtils.scanDocument(context);
-                if (paths.isNotEmpty && mounted) {
-                  setState(() => _billPaths.addAll(paths));
-                }
-              },
-            ),
-            _buildPickerOption(
-              icon: Icons.photo_library_outlined,
-              label: 'Choose from Gallery',
-              onTap: () async {
-                final granted = await PermissionUtils.requestGallery(context);
-                if (!granted) return;
-                Navigator.pop(ctx);
-                final paths = await ImageUtils.pickMultipleImagesFromGallery();
                 if (paths.isNotEmpty && mounted) {
                   setState(() => _billPaths.addAll(paths));
                 }

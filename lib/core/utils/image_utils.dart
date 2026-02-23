@@ -194,6 +194,7 @@ class ImageUtils {
         documentFormat: DocumentFormat.jpeg,
         mode: ScannerMode.full,
         pageLimit: 10,
+        isGalleryImport: true, // Gallery + Smart Scan: same filters, cropping, perspective
       );
       final documentScanner = DocumentScanner(options: options);
       final result = await documentScanner.scanDocument();

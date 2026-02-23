@@ -11,6 +11,7 @@ import '../../models/advance.dart';
 import '../../providers/trip_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../core/services/export_service.dart';
+import '../../core/services/export_notification_service.dart';
 
 import '../dashboard/widgets/trip_form_dialog.dart';
 import '../expense_form/expense_form.dart';
@@ -20,6 +21,7 @@ import '../../services/gemini_service.dart';
 import '../../providers/gemini_provider.dart';
 import '../../core/utils/image_utils.dart';
 import '../../core/constants/expense_constants.dart';
+import '../../core/constants/expense_icons.dart';
 import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_icons.dart';
@@ -343,7 +345,54 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     );
   }
 
+  bool _canDeleteTrip(AsyncValue<List<Expense>> expensesAsync) {
+    return expensesAsync.maybeWhen(
+      data: (expenses) => expenses.isEmpty,
+      orElse: () => false,
+    );
+  }
+
+  Future<void> _showDeleteTripConfirmation(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Trip?'),
+        content: Text(
+          'Are you sure you want to delete "${_trip.name}"? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      try {
+        await ref.read(tripListProvider.notifier).deleteTrip(_trip.id!);
+        if (context.mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Trip deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ErrorHandler.showError(context, e);
+        }
+      }
+    }
+  }
+
   void _showActionsMenu(BuildContext context) {
+    final expensesAsync = ref.read(expensesProvider(_trip.id!));
     final RenderBox button = context.findRenderObject() as RenderBox;
     final RenderBox overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox;
@@ -393,6 +442,35 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
             },
           ),
         ),
+        if (_canDeleteTrip(expensesAsync))
+          PopupMenuItem<String>(
+            value: 'DELETE',
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppDesign.smallSpacing,
+              vertical: AppDesign.smallSpacing,
+            ),
+            child: Builder(
+              builder: (context) {
+                final textStyle = AppTextStyles.bodyMedium;
+                final iconSize = textStyle.fontSize! + 2;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.delete_outline,
+                      size: iconSize,
+                      color: AppDesign.textPrimary,
+                    ),
+                    const Gap(12),
+                    Text(
+                      'Delete Trip',
+                      style: textStyle,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
         PopupMenuItem<String>(
           value: 'UPDATE_STATE',
           padding: const EdgeInsets.symmetric(
@@ -484,6 +562,9 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
       switch (value) {
         case 'EDIT':
           _showEditDialog(context);
+          break;
+        case 'DELETE':
+          _showDeleteTripConfirmation(context);
           break;
         case 'UPDATE_STATE':
           _showUpdateStateDialog(context);
@@ -716,13 +797,17 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
         return;
       }
 
-      // Show success message
+      // Show success message and notification (tap to open)
       if (context.mounted) {
         if (filePath != null) {
-          final fileName = filePath.split('/').last;
+          final fileName = filePath.split(RegExp(r'[/\\]')).last;
+          await ExportNotificationService().showExportReady(
+            filePath: filePath,
+            fileType: fileType,
+          );
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('$fileType file saved: $fileName\nCheck Internal storage > Expenza (or app storage if access was denied)'),
+              content: Text('$fileType saved. Tap the notification to open $fileName'),
               duration: const Duration(seconds: 3),
             ),
           );
@@ -1438,37 +1523,15 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                     ),
                   ),
                   title: Text(
-                    'Smart Scan (Camera)',
+                    'Smart Scan (Camera or Gallery)',
                     style: AppTextStyles.bodyMedium,
                   ),
                   onTap: () async {
-                    final granted = await PermissionUtils.requestCamera(parentContext);
-                    if (!granted) return;
+                    final cameraGranted = await PermissionUtils.requestCamera(parentContext);
+                    if (!cameraGranted) return;
+                    final galleryGranted = await PermissionUtils.requestGallery(parentContext);
+                    if (!galleryGranted) return;
                     final paths = await ImageUtils.scanDocument(context);
-                    if (ctx.mounted) Navigator.pop(ctx, paths);
-                  },
-                ),
-                ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppDesign.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(AppDesign.smallBorderRadius + 2),
-                    ),
-                    child: Icon(
-                      Icons.photo_library_outlined,
-                      color: AppDesign.primary,
-                    ),
-                  ),
-                  title: Text(
-                    'Choose from Gallery',
-                    style: AppTextStyles.bodyMedium,
-                  ),
-                  onTap: () async {
-                    final granted = await PermissionUtils.requestGallery(parentContext);
-                    if (!granted) return;
-                    final paths =
-                        await ImageUtils.pickMultipleImagesFromGallery();
                     if (ctx.mounted) Navigator.pop(ctx, paths);
                   },
                 ),
@@ -1837,7 +1900,7 @@ class _ExpenseListItem extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    _getCategoryIcon(expense.head),
+                    getExpenseIcon(expense.head, expense.subHead),
                     color: _getCategoryColor(expense.head),
                     size: 20,
                   ),
@@ -1859,6 +1922,17 @@ class _ExpenseListItem extends StatelessWidget {
                       '${dateFormat.format(expense.startDate).toUpperCase()} • ${expense.city}${expense.toCity != null && expense.toCity != expense.city ? ' \u2192 ${expense.toCity}' : ''}',
                       style: AppTextStyles.bodySmall,
                     ),
+                    if (expense.notes != null && expense.notes!.trim().isNotEmpty) ...[
+                      const Gap(2),
+                      Text(
+                        expense.notes!.trim(),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppDesign.textTertiary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1873,21 +1947,7 @@ class _ExpenseListItem extends StatelessWidget {
                     ),
                   ),
                   const Gap(2),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (expense.notes != null &&
-                          expense.notes!.isNotEmpty) ...[
-                        Icon(
-                          Icons.notes_rounded,
-                          size: 12,
-                          color: AppDesign.textTertiary,
-                        ),
-                        const Gap(4),
-                      ],
-                      _buildAttachmentIcon(expense.billPaths),
-                    ],
-                  ),
+                  _buildAttachmentIcon(expense.billPaths),
                 ],
               ),
             ],
@@ -1922,21 +1982,6 @@ class _ExpenseListItem extends StatelessWidget {
     }
 
     return Icon(icon, size: 12, color: color);
-  }
-
-  IconData _getCategoryIcon(String head) {
-    switch (head) {
-      case 'Travel':
-        return Icons.directions_car_outlined;
-      case 'Accommodation':
-        return Icons.hotel_outlined;
-      case 'Food':
-        return Icons.restaurant_outlined;
-      case 'Event':
-        return Icons.event_note_outlined;
-      default:
-        return Icons.receipt_outlined;
-    }
   }
 
   Color _getCategoryColor(String head) {

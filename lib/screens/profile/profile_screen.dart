@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/user_profile.dart';
 import '../../providers/user_provider.dart';
 import 'edit_profile_dialog.dart';
@@ -12,6 +14,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_icons.dart';
 import '../../core/theme/premium_icon.dart';
 import '../../core/services/error_handler.dart';
+import '../../core/constants/build_info.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -203,12 +206,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
                 const Gap(20),
-                Text(
-                  'App Version 2.1.0',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppDesign.textTertiary,
-                  ),
-                ),
+                _AppVersionInfo(),
               ],
             ),
           ),
@@ -430,6 +428,62 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (context) =>
           EditProfileDialog(profile: profile, section: section),
+    );
+  }
+}
+
+class _AppVersionInfo extends StatelessWidget {
+  static const _githubReleasesUrl =
+      'https://github.com/SonuSinghRajpoot/expenza/releases';
+
+  const _AppVersionInfo();
+
+  Future<void> _openGitHubReleases(BuildContext context) async {
+    final uri = Uri.parse(_githubReleasesUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<PackageInfo>(
+      future: PackageInfo.fromPlatform(),
+      builder: (context, snapshot) {
+        final version = snapshot.data?.version ?? '—';
+        final buildNumber = snapshot.data?.buildNumber;
+        final versionText = buildNumber != null && buildNumber.isNotEmpty
+            ? '$version+$buildNumber'
+            : version;
+        final hasTimestamp = buildTimestamp.isNotEmpty;
+
+        return GestureDetector(
+          onTap: () => _openGitHubReleases(context),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'App Version $versionText',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppDesign.textTertiary,
+                  decoration: TextDecoration.underline,
+                  decorationColor: AppDesign.textTertiary,
+                ),
+              ),
+              if (hasTimestamp) ...[
+                const Gap(4),
+                Text(
+                  'Rolled out: $buildTimestamp',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppDesign.textTertiary,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }
