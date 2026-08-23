@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart';
@@ -20,6 +18,12 @@ class DatabaseHelper {
     ),
   );
   static const _kDbPassKey = 'db_pass_key';
+
+  /// Unified App-Level Master Encryption Key for SQLCipher.
+  /// Using a deterministic master key ensures that database backups copied across
+  /// app uninstalls, fresh reinstalls, or device migrations can always be decrypted.
+  static const String _kAppMasterPassKey =
+      'Expenza_2026_Unified_Master_Key_f9a8e7d6c5b4a3_@96535';
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -46,22 +50,79 @@ class DatabaseHelper {
       }
     }
 
-    // Ensure we have a secure encryption key
-    String? password = await _secureStorage.read(key: _kDbPassKey);
-    if (password == null) {
-      // In a real app with Biometrics, we might ask the user to set a pin/password or generate one
-      // and protect it with biometrics. For this phase, we generate a random key.
-      password = _generateRandomPassword();
-      await _secureStorage.write(key: _kDbPassKey, value: password);
+    return await _openDatabaseWithKey(path);
+  }
+
+  Future<Database> _openDatabaseWithKey(String path) async {
+    final storedPassword = await _secureStorage.read(key: _kDbPassKey);
+    final fileExists = await File(path).exists();
+
+    // 1. If new DB file, open directly with Unified Master Key
+    if (!fileExists) {
+      await _secureStorage.write(key: _kDbPassKey, value: _kAppMasterPassKey);
+      return await openDatabase(
+        path,
+        version: 10,
+        password: _kAppMasterPassKey,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
     }
 
-    return await openDatabase(
-      path,
-      version: 10, // Bumped to 10 to include notes migration
-      password: password, // SQLCipher encryption
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
+    // 2. Attempt 1: Open with Unified Master Key
+    try {
+      final db = await openDatabase(
+        path,
+        version: 10,
+        password: _kAppMasterPassKey,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+      // Verify schema can be read
+      await db.rawQuery('SELECT count(*) FROM sqlite_master');
+      await _secureStorage.write(key: _kDbPassKey, value: _kAppMasterPassKey);
+      return db;
+    } catch (_) {
+      // 3. Attempt 2: If legacy random password exists from previous install, try opening & re-keying
+      if (storedPassword != null && storedPassword != _kAppMasterPassKey) {
+        try {
+          final legacyDb = await openDatabase(
+            path,
+            version: 10,
+            password: storedPassword,
+            onCreate: _onCreate,
+            onUpgrade: _onUpgrade,
+          );
+          // Re-encrypt database with Unified Master Key
+          await legacyDb.execute("PRAGMA rekey = '$_kAppMasterPassKey';");
+          await _secureStorage.write(
+            key: _kDbPassKey,
+            value: _kAppMasterPassKey,
+          );
+          return legacyDb;
+        } catch (_) {}
+      }
+
+      // 4. Attempt 3: Try opening unencrypted (e.g. raw sqlite imported from outside)
+      try {
+        final unencryptedDb = await openDatabase(
+          path,
+          version: 10,
+          onCreate: _onCreate,
+          onUpgrade: _onUpgrade,
+        );
+        // Encrypt with Unified Master Key
+        await unencryptedDb.execute("PRAGMA rekey = '$_kAppMasterPassKey';");
+        await _secureStorage.write(
+          key: _kDbPassKey,
+          value: _kAppMasterPassKey,
+        );
+        return unencryptedDb;
+      } catch (_) {
+        // If all fallbacks fail, rethrow
+        rethrow;
+      }
+    }
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -180,13 +241,6 @@ class DatabaseHelper {
         upi_name TEXT
       )
     ''');
-  }
-
-  // Generate cryptographically secure random password
-  String _generateRandomPassword() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(32, (i) => random.nextInt(256));
-    return base64Encode(bytes);
   }
 
   Future<void> _onCreate(Database db, int version) async {

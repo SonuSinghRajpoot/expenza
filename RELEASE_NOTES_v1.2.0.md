@@ -53,6 +53,10 @@ Version 1.2.0 delivers major milestones across **Theme-Adaptive Visual Branding*
 ### 10. 💾 Persistent Local Account Backup (`TEST-006`)
 - Auto-syncs and restores profile information, bank/UPI details, and Gemini keys across app reinstalls via public storage.
 
+### 11. 🔑 Unified App-Level Master Encryption Key (`ARCH-009`)
+- **Persistent Decryption Across Reinstalls:** Replaced per-install random key generation with a deterministic unified master encryption key (`_kAppMasterPassKey`), ensuring that database backups and old `.db` files can always be decrypted and read across fresh reinstalls and device migrations.
+- **Auto-Rekey Migration:** Seamlessly detects databases encrypted with older random keys or raw unencrypted databases and automatically re-encrypts them using `PRAGMA rekey`.
+
 ---
 
 ## 📦 Build Artifacts
