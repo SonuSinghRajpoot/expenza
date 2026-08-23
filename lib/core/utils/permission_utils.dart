@@ -5,23 +5,27 @@ import 'package:permission_handler/permission_handler.dart';
 /// Utility for requesting Android-standard permissions before camera/gallery/file access.
 class PermissionUtils {
   /// Request notifications, storage, and gallery permissions on app launch (Android only).
-  /// Called once when the app starts; system dialogs are shown in sequence.
+  /// Requests required launch permissions in a single batch.
   static Future<void> requestLaunchPermissions() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
 
-    // Notifications (for export completion alerts)
-    if (!(await Permission.notification.isGranted)) {
-      await Permission.notification.request();
-    }
+    try {
+      final permissionsToRequest = <Permission>[];
+      if (!(await Permission.notification.isGranted)) {
+        permissionsToRequest.add(Permission.notification);
+      }
+      if (!(await Permission.photos.isGranted)) {
+        permissionsToRequest.add(Permission.photos);
+      }
+      if (!(await Permission.storage.isGranted)) {
+        permissionsToRequest.add(Permission.storage);
+      }
 
-    // Gallery/Photos (for picking images, Smart Scan)
-    if (!(await Permission.photos.isGranted)) {
-      await Permission.photos.request();
-    }
-
-    // Storage (for file access on older Android, saving exports)
-    if (!(await Permission.storage.isGranted)) {
-      await Permission.storage.request();
+      if (permissionsToRequest.isNotEmpty) {
+        await permissionsToRequest.request();
+      }
+    } catch (e) {
+      debugPrint('PermissionUtils.requestLaunchPermissions error: $e');
     }
   }
   /// Request camera permission. Returns true if granted, false otherwise.

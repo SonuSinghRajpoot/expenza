@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/services/biometric_service.dart';
 import 'core/services/export_notification_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/utils/permission_utils.dart';
 import 'providers/theme_provider.dart';
 import 'screens/main_navigation_screen.dart';
 import 'widgets/biometric_lock_gate.dart';

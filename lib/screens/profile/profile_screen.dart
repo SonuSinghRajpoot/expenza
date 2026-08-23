@@ -657,9 +657,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         setState(() {});
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text(
-                                'Account configuration restored successfully!',
+                                result.message ??
+                                    'Account configuration restored successfully!',
                               ),
                             ),
                           );
@@ -667,9 +668,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       } else {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                            SnackBar(
                               content: Text(
-                                'No local backup file found to restore.',
+                                result.message ??
+                                    'No local backup file found to restore.',
                               ),
                             ),
                           );

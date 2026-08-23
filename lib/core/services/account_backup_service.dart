@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/user_profile.dart';
 import '../../models/gemini_key.dart';
@@ -21,6 +23,24 @@ class AccountBackupService {
   static const String _configFileName = 'expenza_account_config.json';
   static const String _spBackupKey = 'local_account_backup_json';
   bool _isRestoring = false;
+
+  /// Checks and requests storage access for external public directories (Android).
+  Future<bool> ensureStoragePermission() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+    try {
+      if (await Permission.manageExternalStorage.isGranted) return true;
+      final mStatus = await Permission.manageExternalStorage.request();
+      if (mStatus.isGranted) return true;
+
+      // Fallback for older Android versions
+      if (await Permission.storage.isGranted) return true;
+      final sStatus = await Permission.storage.request();
+      return sStatus.isGranted;
+    } catch (e) {
+      debugPrint('AccountBackupService: permission check error: $e');
+      return false;
+    }
+  }
 
   /// Candidate directory paths for persistent storage on Android and desktop platforms.
   Future<List<Directory>> _getPersistentCandidateDirs() async {
@@ -101,7 +121,7 @@ class AccountBackupService {
       } catch (_) {}
     }
 
-    // Fallback to SharedPreferences if file is unavailable (e.g., in unit tests or storage permission pending)
+    // Fallback to SharedPreferences if file is unavailable
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedJson = prefs.getString(_spBackupKey);
@@ -213,79 +233,12 @@ class AccountBackupService {
         return (restored: false, profile: null, keys: null, activeModel: null);
       }
 
-      _isRestoring = true;
-      UserProfile? restoredProfile;
-      List<GeminiKey> restoredKeys = [];
-      String? restoredModel;
-
-      // 1. Restore User Profile
-      if (backupData['user_profile'] != null) {
-        final profileMap =
-            Map<String, dynamic>.from(backupData['user_profile'] as Map);
-        restoredProfile = UserProfile.fromMap(profileMap);
-
-        if (kIsWeb) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user_profile', jsonEncode(profileMap));
-        } else {
-          try {
-            final db = await DatabaseHelper().database;
-            final existing = await db.query('user_profile', limit: 1);
-            if (existing.isEmpty) {
-              await db.insert('user_profile', restoredProfile.toMap());
-            }
-          } catch (e) {
-            debugPrint('AccountBackupService: database insert profile skipped ($e)');
-          }
-        }
-      }
-
-      // 2. Restore Gemini Configuration
-      if (backupData['gemini_config'] != null) {
-        final geminiMap =
-            Map<String, dynamic>.from(backupData['gemini_config'] as Map);
-
-        // Active Model
-        restoredModel = geminiMap['active_model'] as String?;
-        if (restoredModel != null && restoredModel.isNotEmpty) {
-          try {
-            await GeminiRepository().setSelectedModel(restoredModel);
-          } catch (_) {}
-        }
-
-        // Keys
-        if (geminiMap['keys'] != null) {
-          final rawKeys = geminiMap['keys'] as List;
-          try {
-            final geminiRepo = GeminiRepository();
-            final existingKeys = await geminiRepo.getKeys();
-
-            if (existingKeys.isEmpty) {
-              for (final rawKey in rawKeys) {
-                final keyObj =
-                    GeminiKey.fromMap(Map<String, dynamic>.from(rawKey as Map));
-                restoredKeys.add(keyObj);
-                await geminiRepo.saveKey(keyObj);
-              }
-            } else {
-              restoredKeys = existingKeys;
-            }
-          } catch (_) {
-            for (final rawKey in rawKeys) {
-              final keyObj =
-                  GeminiKey.fromMap(Map<String, dynamic>.from(rawKey as Map));
-              restoredKeys.add(keyObj);
-            }
-          }
-        }
-      }
-
-      _isRestoring = false;
+      final res = await _applyBackupData(backupData);
       return (
         restored: true,
-        profile: restoredProfile,
-        keys: restoredKeys,
-        activeModel: restoredModel,
+        profile: res.profile,
+        keys: res.keys,
+        activeModel: res.activeModel,
       );
     } catch (e) {
       _isRestoring = false;
@@ -294,84 +247,219 @@ class AccountBackupService {
     }
   }
 
-  /// Manually restores account profile and Gemini keys from the persistent backup file.
+  /// Manually restores account profile and Gemini keys from the persistent backup file
+  /// or allows picking a backup JSON or SQLite database file via system file picker.
   Future<({
     bool restored,
     UserProfile? profile,
     List<GeminiKey>? keys,
     String? activeModel,
-  })> manualRestore() async {
+    String? message,
+  })> manualRestore({bool allowPicker = true}) async {
+    // 1. Try reading the default persistent backup file first
+    final backupData = await _readBackupData(requestPermission: true);
+    if (backupData != null) {
+      final res = await _applyBackupData(backupData);
+      return (
+        restored: true,
+        profile: res.profile,
+        keys: res.keys,
+        activeModel: res.activeModel,
+        message: 'Account configuration restored successfully from Documents/Expenza!',
+      );
+    }
+
+    // 2. If automatic file access is restricted by Android OS or file not found, open FilePicker
+    if (allowPicker && !kIsWeb) {
+      try {
+        final file = await FilePicker.pickFile(
+          type: FileType.any,
+          dialogTitle: 'Select Expenza Backup or Database File',
+        );
+
+        if (file != null) {
+          if (file.path != null) {
+            return await restoreFromSpecificFile(File(file.path!));
+          } else {
+            final bytes = await file.readAsBytes();
+            if (bytes.isNotEmpty) {
+              final content = utf8.decode(bytes);
+              final data = jsonDecode(content) as Map<String, dynamic>;
+              final res = await _applyBackupData(data);
+              return (
+                restored: true,
+                profile: res.profile,
+                keys: res.keys,
+                activeModel: res.activeModel,
+                message:
+                    'Account configuration restored successfully from ${file.name}!',
+              );
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('AccountBackupService.manualRestore picker error: $e');
+      }
+    }
+
+    return (
+      restored: false,
+      profile: null,
+      keys: null,
+      activeModel: null,
+      message: 'No backup file selected or found.',
+    );
+  }
+
+  /// Restores from a specific file (JSON config or SQLite .db).
+  Future<({
+    bool restored,
+    UserProfile? profile,
+    List<GeminiKey>? keys,
+    String? activeModel,
+    String? message,
+  })> restoreFromSpecificFile(File file) async {
     try {
-      final backupData = await _readBackupData();
-      if (backupData == null) {
-        return (restored: false, profile: null, keys: null, activeModel: null);
+      final fileName = p.basename(file.path).toLowerCase();
+
+      // Case A: JSON Configuration Backup
+      if (fileName.endsWith('.json') || fileName.contains('config')) {
+        final content = await file.readAsString();
+        final data = jsonDecode(content) as Map<String, dynamic>;
+        final res = await _applyBackupData(data);
+        return (
+          restored: true,
+          profile: res.profile,
+          keys: res.keys,
+          activeModel: res.activeModel,
+          message: 'Account configuration restored successfully from ${p.basename(file.path)}!',
+        );
       }
 
-      _isRestoring = true;
-      UserProfile? restoredProfile;
-      List<GeminiKey> restoredKeys = [];
-      String? restoredModel;
+      // Case B: SQLite Database Backup (.db)
+      if (fileName.endsWith('.db')) {
+        final appDoc = await getApplicationDocumentsDirectory();
+        final dbDir = Directory(p.join(appDoc.path, 'Expenza', 'db'));
+        if (!await dbDir.exists()) await dbDir.create(recursive: true);
+        final targetPath = p.join(dbDir.path, 'field_expenses_v1.db');
 
-      // Restore User Profile
-      if (backupData['user_profile'] != null) {
-        final profileMap =
-            Map<String, dynamic>.from(backupData['user_profile'] as Map);
-        restoredProfile = UserProfile.fromMap(profileMap);
+        // Copy database
+        await file.copy(targetPath);
 
-        if (kIsWeb) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('user_profile', jsonEncode(profileMap));
-        } else {
+        // Re-open DB to verify and trigger auto-rekey if needed
+        final db = await DatabaseHelper().database;
+        await db.rawQuery('SELECT count(*) FROM sqlite_master');
+
+        // Reload profile and keys from the newly restored database
+        final profileMaps = await db.query('user_profile', limit: 1);
+        final restoredProfile = profileMaps.isNotEmpty
+            ? UserProfile.fromMap(profileMaps.first)
+            : null;
+        final restoredKeys = await GeminiRepository().getKeys();
+        final restoredModel = await GeminiRepository().getSelectedModel();
+
+        return (
+          restored: true,
+          profile: restoredProfile,
+          keys: restoredKeys,
+          activeModel: restoredModel,
+          message: 'Database & all trips restored successfully from ${p.basename(file.path)}!',
+        );
+      }
+    } catch (e) {
+      debugPrint('AccountBackupService.restoreFromSpecificFile error: $e');
+    }
+
+    return (
+      restored: false,
+      profile: null,
+      keys: null,
+      activeModel: null,
+      message: 'Failed to read or parse the selected backup file.',
+    );
+  }
+
+  /// Internal helper to apply parsed backup data into database and repositories.
+  Future<({
+    UserProfile? profile,
+    List<GeminiKey> keys,
+    String? activeModel,
+  })> _applyBackupData(Map<String, dynamic> backupData) async {
+    _isRestoring = true;
+    UserProfile? restoredProfile;
+    List<GeminiKey> restoredKeys = [];
+    String? restoredModel;
+
+    // 1. Restore User Profile
+    if (backupData['user_profile'] != null) {
+      final profileMap =
+          Map<String, dynamic>.from(backupData['user_profile'] as Map);
+      restoredProfile = UserProfile.fromMap(profileMap);
+
+      if (kIsWeb) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_profile', jsonEncode(profileMap));
+      } else {
+        try {
           final db = await DatabaseHelper().database;
           await db.delete('user_profile');
           await db.insert('user_profile', restoredProfile.toMap());
+        } catch (e) {
+          debugPrint('AccountBackupService: database insert profile error: $e');
         }
       }
+    }
 
-      // Restore Gemini Config
-      if (backupData['gemini_config'] != null) {
-        final geminiMap =
-            Map<String, dynamic>.from(backupData['gemini_config'] as Map);
+    // 2. Restore Gemini Configuration
+    if (backupData['gemini_config'] != null) {
+      final geminiMap =
+          Map<String, dynamic>.from(backupData['gemini_config'] as Map);
 
-        restoredModel = geminiMap['active_model'] as String?;
-        if (restoredModel != null && restoredModel.isNotEmpty) {
+      // Active Model
+      restoredModel = geminiMap['active_model'] as String?;
+      if (restoredModel != null && restoredModel.isNotEmpty) {
+        try {
           await GeminiRepository().setSelectedModel(restoredModel);
-        }
+        } catch (_) {}
+      }
 
-        if (geminiMap['keys'] != null) {
-          final rawKeys = geminiMap['keys'] as List;
-          final geminiRepo = GeminiRepository();
+      // Keys
+      if (geminiMap['keys'] != null) {
+        final rawKeys = geminiMap['keys'] as List;
+        final geminiRepo = GeminiRepository();
 
-          if (!kIsWeb) {
+        if (!kIsWeb) {
+          try {
             final db = await DatabaseHelper().database;
             await db.delete('gemini_keys');
-          }
+          } catch (_) {}
+        }
 
-          for (final rawKey in rawKeys) {
-            final keyObj =
-                GeminiKey.fromMap(Map<String, dynamic>.from(rawKey as Map));
-            restoredKeys.add(keyObj);
+        for (final rawKey in rawKeys) {
+          final keyObj =
+              GeminiKey.fromMap(Map<String, dynamic>.from(rawKey as Map));
+          restoredKeys.add(keyObj);
+          try {
             await geminiRepo.saveKey(keyObj);
-          }
+          } catch (_) {}
         }
       }
-
-      _isRestoring = false;
-      return (
-        restored: true,
-        profile: restoredProfile,
-        keys: restoredKeys,
-        activeModel: restoredModel,
-      );
-    } catch (e) {
-      _isRestoring = false;
-      debugPrint('AccountBackupService.manualRestore error: $e');
-      return (restored: false, profile: null, keys: null, activeModel: null);
     }
+
+    _isRestoring = false;
+    return (
+      profile: restoredProfile,
+      keys: restoredKeys,
+      activeModel: restoredModel,
+    );
   }
 
   /// Internal helper to read backup data from file or SharedPreferences.
-  Future<Map<String, dynamic>?> _readBackupData() async {
+  Future<Map<String, dynamic>?> _readBackupData({bool requestPermission = false}) async {
+    if (requestPermission && !kIsWeb && Platform.isAndroid) {
+      await ensureStoragePermission();
+    }
+
     // 1. Check persistent file first
     final file = await getBackupFile();
     if (file != null) {
@@ -382,6 +470,18 @@ class AccountBackupService {
         }
       } catch (e) {
         debugPrint('AccountBackupService: failed reading file: $e');
+        // If permission was denied, attempt permission request once and retry
+        if (!requestPermission && !kIsWeb && Platform.isAndroid) {
+          final granted = await ensureStoragePermission();
+          if (granted) {
+            try {
+              final content = await file.readAsString();
+              if (content.trim().isNotEmpty) {
+                return jsonDecode(content) as Map<String, dynamic>;
+              }
+            } catch (_) {}
+          }
+        }
       }
     }
 

@@ -34,6 +34,13 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_launchPermissionsRequested) {
+        _launchPermissionsRequested = true;
+        PermissionUtils.requestLaunchPermissions();
+      }
+    });
+
     if (!kIsWeb) {
       // For sharing images coming from outside the app while the app is in the memory
       _intentDataStreamSubscription = ReceiveSharingIntent.instance
