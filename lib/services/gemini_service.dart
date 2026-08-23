@@ -32,8 +32,16 @@ class GeminiService {
         ? ' Document spans $imageCount pages/images: itinerary, hotel folios, check-in/out and grand totals may appear on any page.'
         : '';
     return 'Extract from this receipt/document into JSON: head (one of $availableHeads), subHead (MANDATORY: one of SubHeads for the chosen head), amount, date (YYYY-MM-DD), endDate, fromCity, toCity (null if non-travel), pax (number of people; null if not applicable). Do NOT extract notes. $loc\n'
-        'SubHeads: $subHeadsBlock\n'
-        'Amount: Use final total/balance due; if multiple totals, use the grand total.\n'
+        'SubHeads: $subHeadsBlock\n\n'
+        'CRITICAL AMOUNT & DEDUCTION RULES:\n'
+        '1. Search for all price figures: Base Fare / Item price, Subtotal, Taxes/GST, Ancillary fees (Convenience fee, Seat selection, Meal add-on, Baggage fee, Service charge), Gross Amount, Discounts, Coupons, Promo Codes, and Amount Paid.\n'
+        '2. ALWAYS return the FINAL NET AMOUNT PAID / TOTAL AMOUNT CHARGED after applying all deductions, discounts, promo codes, cashback, or coupons.\n'
+        '3. For Flight Tickets & Travel Invoices (MakeMyTrip, Indigo, EaseMyTrip, Air India, Cleartrip, IRCTC, etc.):\n'
+        '   - Identify Base Fare vs Gross Total vs Instant Discount vs Convenience/Platform Fee.\n'
+        '   - Return the actual final amount deducted/charged (Total Amount Paid / Net Paid / Amount Charged to Bank/Card/UPI), NOT the gross total or base fare before discount.\n'
+        '4. For Hotel Folios & Restaurant Bills:\n'
+        '   - Return the Net Amount Paid / Balance Settled after applying any advance payment, promo voucher, or coupon.\n'
+        '5. Never return the pre-discount total or base fare when discounts/deductions are present.\n\n'
         'Meal: Breakfast 4-12, Lunch 12-16, Snacks 16-19, Dinner 19-4. No time: infer.\n'
         'Merchant logic: Be smart with merchant names. If Uber, Ola, Rapido, BluSmart, or similar cab/bike keywords appear, infer Travel head with Cab or Bike subHead. Swiggy/Zomato -> Food. OYO/MakeMyTrip (hotels) -> Accommodation. Use merchant context to infer appropriate head and subHead from the allowed list.\n'
         'If a field cannot be determined, use null. Do not guess dates or amounts.$multiPageHint';
@@ -47,8 +55,16 @@ class GeminiService {
   ) {
     final subHeadsBlock = _buildSubHeadsBlock(availableSubHeads);
     return 'Extract from this receipt text into JSON: head (one of $availableHeads), subHead (MANDATORY: one of SubHeads for the chosen head), amount, date (YYYY-MM-DD), endDate, fromCity, toCity (null if non-travel), pax (number of people; null if not applicable). Do NOT extract notes. $loc\n'
-        'SubHeads: $subHeadsBlock\n'
-        'Amount: Use final total/balance due; if multiple totals, use the grand total.\n'
+        'SubHeads: $subHeadsBlock\n\n'
+        'CRITICAL AMOUNT & DEDUCTION RULES:\n'
+        '1. Search for all price figures: Base Fare / Item price, Subtotal, Taxes/GST, Ancillary fees (Convenience fee, Seat selection, Meal add-on, Baggage fee, Service charge), Gross Amount, Discounts, Coupons, Promo Codes, and Amount Paid.\n'
+        '2. ALWAYS return the FINAL NET AMOUNT PAID / TOTAL AMOUNT CHARGED after applying all deductions, discounts, promo codes, cashback, or coupons.\n'
+        '3. For Flight Tickets & Travel Invoices (MakeMyTrip, Indigo, EaseMyTrip, Air India, Cleartrip, IRCTC, etc.):\n'
+        '   - Identify Base Fare vs Gross Total vs Instant Discount vs Convenience/Platform Fee.\n'
+        '   - Return the actual final amount deducted/charged (Total Amount Paid / Net Paid / Amount Charged to Bank/Card/UPI), NOT the gross total or base fare before discount.\n'
+        '4. For Hotel Folios & Restaurant Bills:\n'
+        '   - Return the Net Amount Paid / Balance Settled after applying any advance payment, promo voucher, or coupon.\n'
+        '5. Never return the pre-discount total or base fare when discounts/deductions are present.\n\n'
         'Meal: Breakfast 4-12, Lunch 12-16, Snacks 16-19, Dinner 19-4. No time: infer.\n'
         'Merchant logic: Be smart with merchant names. If Uber, Ola, Rapido, BluSmart, or similar cab/bike keywords appear, infer Travel head with Cab or Bike subHead. Swiggy/Zomato -> Food. OYO/MakeMyTrip (hotels) -> Accommodation. Use merchant context to infer appropriate head and subHead from the allowed list.\n'
         'If a field cannot be determined, use null. Do not guess dates or amounts.\n\n'
@@ -73,7 +89,8 @@ class GeminiService {
           nullable: true,
         ),
         'amount': gai.Schema.number(
-          description: 'Final total/balance due amount',
+          description:
+              'Final net total amount paid after all deductions, discounts, promo codes, taxes, and fees',
           nullable: true,
         ),
         'date': gai.Schema.string(
@@ -246,10 +263,10 @@ class GeminiService {
         var bytes = await XFile(path).readAsBytes();
         final decoded = img.decodeImage(bytes);
         if (decoded != null &&
-            (decoded.width > 768 || decoded.height > 768)) {
+            (decoded.width > 1280 || decoded.height > 1280)) {
           final resized = decoded.width >= decoded.height
-              ? img.copyResize(decoded, width: 768)
-              : img.copyResize(decoded, height: 768);
+              ? img.copyResize(decoded, width: 1280)
+              : img.copyResize(decoded, height: 1280);
           bytes = img.encodeJpg(resized, quality: 85);
         }
         parts.add(gai.DataPart('image/jpeg', bytes));
