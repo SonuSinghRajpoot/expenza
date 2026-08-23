@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
-import 'package:pdfx/pdfx.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
@@ -59,10 +59,16 @@ class ImageUtils {
     try {
       final bytes = await xfile.readAsBytes();
       if (bytes.isEmpty) return null;
-      // Try to normalize to JPEG for maximum compatibility (PDF export, sharing, etc.)
+      // Normalize to high-quality JPEG (max 1800px for crystal-clear readability & 60% smaller size)
       final decoded = img.decodeImage(bytes);
       if (decoded != null) {
-        final jpgBytes = Uint8List.fromList(img.encodeJpg(decoded, quality: 85));
+        img.Image processed = decoded;
+        if (decoded.width > 1800 || decoded.height > 1800) {
+          processed = decoded.width >= decoded.height
+              ? img.copyResize(decoded, width: 1800)
+              : img.copyResize(decoded, height: 1800);
+        }
+        final jpgBytes = Uint8List.fromList(img.encodeJpg(processed, quality: 85));
         return await _persistImageBytesToBillsDir(jpgBytes, extension: '.jpg');
       }
 
@@ -115,16 +121,21 @@ class ImageUtils {
         return normalized;
       }
       
-      // File is not in persistent storage; read bytes and (when possible) re-encode to JPEG
+      // File is not in persistent storage; read bytes and (when possible) re-encode to high-quality JPEG
       final ext = p.extension(normalized).toLowerCase();
       final rawBytes = await f.readAsBytes();
       if (rawBytes.isEmpty) return sourcePath;
 
       // Try to decode using the `image` package (supports many formats like PNG/JPEG/WebP).
-      // If decoding fails, fall back to raw copy.
       final decoded = img.decodeImage(rawBytes);
       if (decoded != null) {
-        final jpgBytes = Uint8List.fromList(img.encodeJpg(decoded, quality: 85));
+        img.Image processed = decoded;
+        if (decoded.width > 1800 || decoded.height > 1800) {
+          processed = decoded.width >= decoded.height
+              ? img.copyResize(decoded, width: 1800)
+              : img.copyResize(decoded, height: 1800);
+        }
+        final jpgBytes = Uint8List.fromList(img.encodeJpg(processed, quality: 85));
         final destPath = await _persistImageBytesToBillsDir(jpgBytes, extension: '.jpg');
         if (destPath != null) return destPath;
       }
@@ -191,7 +202,7 @@ class ImageUtils {
     // MOBILE: ML Kit Scanner – copy each result to persistent storage
     try {
       final options = DocumentScannerOptions(
-        documentFormat: DocumentFormat.jpeg,
+        documentFormats: {DocumentFormat.jpeg},
         mode: ScannerMode.full,
         pageLimit: 10,
         isGalleryImport: true, // Gallery + Smart Scan: same filters, cropping, perspective
@@ -199,8 +210,11 @@ class ImageUtils {
       final documentScanner = DocumentScanner(options: options);
       final result = await documentScanner.scanDocument();
       final List<String> out = [];
-      for (final src in result.images) {
-        out.add(await _copyToBillsDir(src));
+      final images = result.images;
+      if (images != null) {
+        for (final src in images) {
+          out.add(await _copyToBillsDir(src));
+        }
       }
       return out;
     } catch (e) {
@@ -215,19 +229,24 @@ class ImageUtils {
     }
   }
 
+  static const MethodChannel _pdfChannel =
+      MethodChannel('com.fieldexpensemanager/pdf_renderer');
+
   static Future<List<String>> pickPdfAndConvert() async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
+      final PlatformFile? file = await FilePicker.pickFile(
         type: FileType.custom,
         allowedExtensions: ['pdf'],
-        withData: kIsWeb,
       );
 
-      if (result != null) {
-        if (kIsWeb && result.files.single.bytes != null) {
-          return await _convertPdfDataToImages(result.files.single.bytes!);
-        } else if (result.files.single.path != null) {
-          return await convertPdfToImages(result.files.single.path!);
+      if (file != null) {
+        if (kIsWeb) {
+          final bytes = await file.readAsBytes();
+          if (bytes.isNotEmpty) {
+            return await _convertPdfDataToImages(bytes);
+          }
+        } else if (file.path != null) {
+          return await convertPdfToImages(file.path!);
         }
       }
     } catch (e) {
@@ -237,74 +256,41 @@ class ImageUtils {
   }
 
   static Future<List<String>> _convertPdfDataToImages(Uint8List data) async {
-    final List<String> imagePaths = [];
     try {
-      final document = await PdfDocument.openData(data);
-      const uuid = Uuid();
-
-      for (int i = 1; i <= document.pagesCount; i++) {
-        final page = await document.getPage(i);
-        final pageImage = await page.render(
-          width: page.width * 2,
-          height: page.height * 2,
-          format: PdfPageImageFormat.jpeg,
-          quality: 80,
-        );
-
-        if (pageImage != null) {
-          if (kIsWeb) {
-            final xFile = XFile.fromData(
-              pageImage.bytes,
-              mimeType: 'image/jpeg',
-              name: 'pdf_page_${uuid.v4()}_$i.jpg',
-            );
-            imagePaths.add(xFile.path);
-          } else {
-            final dir = await _billsDirectory();
-            final fileName = 'pdf_page_${uuid.v4()}_$i.jpg';
-            final file = File('${dir.path}/$fileName');
-            await file.writeAsBytes(pageImage.bytes);
-            imagePaths.add(file.path);
-          }
-        }
-        await page.close();
+      final dir = await _billsDirectory();
+      final List<dynamic>? rendered = await _pdfChannel.invokeListMethod(
+        'renderPdfData',
+        {
+          'bytes': data,
+          'outputDir': dir.path,
+        },
+      );
+      if (rendered != null) {
+        return rendered.cast<String>();
       }
-      await document.close();
     } catch (e) {
       debugPrint('Error converting PDF data to images: $e');
     }
-    return imagePaths;
+    return [];
   }
 
   static Future<List<String>> convertPdfToImages(String pdfPath) async {
-    final List<String> imagePaths = [];
     try {
-      final document = await PdfDocument.openFile(pdfPath);
       final dir = await _billsDirectory();
-      const uuid = Uuid();
-
-      for (int i = 1; i <= document.pagesCount; i++) {
-        final page = await document.getPage(i);
-        final pageImage = await page.render(
-          width: page.width * 2,
-          height: page.height * 2,
-          format: PdfPageImageFormat.jpeg,
-          quality: 80,
-        );
-
-        if (pageImage != null) {
-          final fileName = 'pdf_page_${uuid.v4()}_$i.jpg';
-          final file = File('${dir.path}/$fileName');
-          await file.writeAsBytes(pageImage.bytes);
-          imagePaths.add(file.path);
-        }
-        await page.close();
+      final List<dynamic>? rendered = await _pdfChannel.invokeListMethod(
+        'renderPdfPages',
+        {
+          'pdfPath': pdfPath,
+          'outputDir': dir.path,
+        },
+      );
+      if (rendered != null) {
+        return rendered.cast<String>();
       }
-      await document.close();
     } catch (e) {
       debugPrint('Error converting PDF to images: $e');
     }
-    return imagePaths;
+    return [];
   }
 
   /// Converts a list of paths to image paths. PDFs are converted to JPG images;

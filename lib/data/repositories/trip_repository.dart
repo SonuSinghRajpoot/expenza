@@ -13,35 +13,83 @@ class TripRepository {
   static List<Trip> _mockTrips = [];
   static bool _initialized = false;
 
+  /// Calculates the chronological display order index for inserting a new expense.
+  /// Places the expense chronologically by start date (comparing calendar day only).
+  /// If expenses already exist on the same date, places the new expense after all
+  /// same-date entries (FIFO order for the same day), but before any subsequent dates.
+  static int calculateInsertionIndex(List<Expense> existingExpenses, DateTime newStartDate) {
+    final newDateOnly = DateTime(
+      newStartDate.year,
+      newStartDate.month,
+      newStartDate.day,
+    );
+
+    int targetIndex = existingExpenses.length;
+    for (int i = 0; i < existingExpenses.length; i++) {
+      final current = existingExpenses[i];
+      final currentDateOnly = DateTime(
+        current.startDate.year,
+        current.startDate.month,
+        current.startDate.day,
+      );
+      if (currentDateOnly.isAfter(newDateOnly)) {
+        targetIndex = i;
+        break;
+      }
+    }
+    return targetIndex;
+  }
+
   // Expense Methods
   Future<int> createExpense(Expense expense) async {
     if (kIsWeb) {
       await _ensureInitialized();
       final newId = (_mockExpenses.lastOrNull?.id ?? 0) + 1;
-      final tripExpenses = _mockExpenses.where((e) => e.tripId == expense.tripId).toList();
-      final maxOrder = tripExpenses.fold<int>(-1, (m, e) {
-        final o = e.displayOrder ?? -1;
-        return o > m ? o : m;
-      });
-      final displayOrder = maxOrder + 1;
-      final newExpense = expense.copyWith(id: newId, displayOrder: displayOrder);
+      final tripExpenses = await getExpenses(expense.tripId);
+      final targetIndex = calculateInsertionIndex(tripExpenses, expense.startDate);
+
+      // Shift subsequent mock expenses by +1
+      if (targetIndex < tripExpenses.length) {
+        for (int i = targetIndex; i < tripExpenses.length; i++) {
+          final oldExp = tripExpenses[i];
+          final mockIdx = _mockExpenses.indexWhere((e) => e.id == oldExp.id);
+          if (mockIdx != -1) {
+            _mockExpenses[mockIdx] = _mockExpenses[mockIdx].copyWith(displayOrder: i + 1);
+          }
+        }
+      }
+
+      final newExpense = expense.copyWith(id: newId, displayOrder: targetIndex);
       _mockExpenses.add(newExpense);
       await _saveMockData();
       return newId;
     }
+
     final db = await _dbHelper.database;
     final tripExpenses = await getExpenses(expense.tripId);
-    final maxOrder = tripExpenses.fold<int>(-1, (m, e) {
-      final o = e.displayOrder ?? -1;
-      return o > m ? o : m;
-    });
-    final displayOrder = maxOrder + 1;
+    final targetIndex = calculateInsertionIndex(tripExpenses, expense.startDate);
+
+    // If inserting before existing items, shift subsequent display_order values by +1
+    if (targetIndex < tripExpenses.length) {
+      final batch = db.batch();
+      for (int i = targetIndex; i < tripExpenses.length; i++) {
+        final existingExp = tripExpenses[i];
+        batch.update(
+          'expenses',
+          {'display_order': i + 1},
+          where: 'id = ?',
+          whereArgs: [existingExp.id],
+        );
+      }
+      await batch.commit(noResult: true);
+    }
+
     final expenseMap = expense.toMap();
-    expenseMap['display_order'] = displayOrder;
+    expenseMap['display_order'] = targetIndex;
     return await db.insert('expenses', expenseMap);
   }
 
-  Future<List<Expense>> getExpenses(int tripId) async {
+  Future<List<Expense>> getExpenses(int tripId, {int? limit, int? offset}) async {
     if (kIsWeb) {
       await _ensureInitialized();
       final expenses = _mockExpenses.where((e) => e.tripId == tripId).toList();
@@ -54,6 +102,13 @@ class TripRepository {
         }
         return b.startDate.compareTo(a.startDate);
       });
+      if (offset != null || limit != null) {
+        final start = (offset ?? 0).clamp(0, expenses.length);
+        final end = limit != null
+            ? (start + limit).clamp(start, expenses.length)
+            : expenses.length;
+        return expenses.sublist(start, end);
+      }
       return expenses;
     }
     final db = await _dbHelper.database;
@@ -61,7 +116,10 @@ class TripRepository {
       'expenses',
       where: 'trip_id = ?',
       whereArgs: [tripId],
-      orderBy: 'CASE WHEN display_order IS NULL THEN 1 ELSE 0 END, display_order ASC, start_date DESC',
+      orderBy:
+          'CASE WHEN display_order IS NULL THEN 1 ELSE 0 END, display_order ASC, start_date DESC',
+      limit: limit,
+      offset: offset,
     );
     return List.generate(maps.length, (i) => Expense.fromMap(maps[i]));
   }

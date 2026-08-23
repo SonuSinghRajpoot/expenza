@@ -9,9 +9,8 @@ import 'trip_card.dart';
 import 'widgets/trip_form_dialog.dart';
 import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../core/theme/app_icons.dart';
-import '../../core/theme/premium_icon.dart';
 import '../../core/services/error_handler.dart';
+import '../../widgets/shimmer_loading.dart';
 
 class ExpensesScreen extends ConsumerStatefulWidget {
   const ExpensesScreen({super.key});
@@ -31,14 +30,14 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     final tripListAsync = ref.watch(tripListProvider);
 
     return Scaffold(
-      backgroundColor: AppDesign.surface,
+      backgroundColor: AppDesign.surfaceOf(context),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             expandedHeight: 100.0,
             floating: true,
             pinned: true,
-            backgroundColor: AppDesign.surfaceElevated,
+            backgroundColor: AppDesign.surfaceElevatedOf(context),
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(
@@ -47,9 +46,9 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
               ),
               title: Text(
                 'Expenses',
-                style: AppTextStyles.headline1,
+                style: AppTextStyles.headline1Of(context),
               ),
-              background: Container(color: AppDesign.surfaceElevated),
+              background: Container(color: AppDesign.surfaceElevatedOf(context)),
             ),
           ),
           SliverToBoxAdapter(
@@ -58,16 +57,15 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                 AppDesign.screenHorizontalPadding,
                 AppDesign.smallSpacing,
                 AppDesign.screenHorizontalPadding,
-                AppDesign.smallSpacing, // Reduced from sectionSpacing to normalize gap
+                AppDesign.smallSpacing,
               ),
               child: _buildQuickStats(context, ref, tripListAsync),
             ),
           ),
-
           tripListAsync.when(
             data: (trips) {
               if (trips.isEmpty) {
-                return const SliverFillRemaining(
+                return SliverFillRemaining(
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -75,12 +73,14 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                         Icon(
                           Icons.luggage_outlined,
                           size: 64,
-                          color: Colors.grey,
+                          color: AppDesign.textTertiaryOf(context),
                         ),
-                        Gap(16),
+                        const Gap(16),
                         Text(
                           'No trips yet',
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(
+                            color: AppDesign.textTertiaryOf(context),
+                          ),
                         ),
                       ],
                     ),
@@ -93,7 +93,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
 
               // Build list of collapsible panels (only show non-empty statuses)
               final slivers = <Widget>[];
-              
+
               // Active panel (expanded by default)
               if (groupedTrips['Active']?.isNotEmpty ?? false) {
                 slivers.add(_CollapsibleStatusPanel(
@@ -104,7 +104,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                   onExpansionChanged: (expanded) {
                     setState(() => _activeExpanded = expanded);
                   },
-                  color: AppDesign.primary,
+                  color: Theme.of(context).colorScheme.primary,
                   startIndex: 0,
                 ));
               }
@@ -120,7 +120,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                   onExpansionChanged: (expanded) {
                     setState(() => _submittedExpanded = expanded);
                   },
-                  color: AppDesign.textSecondary,
+                  color: AppDesign.textSecondaryOf(context),
                   startIndex: activeCount,
                 ));
               }
@@ -161,11 +161,24 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                 ),
               );
             },
-            loading: () => const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
+            loading: () => SliverPadding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppDesign.screenHorizontalPadding,
+                vertical: AppDesign.screenVerticalPadding,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate(const [
+                  TripCardSkeleton(),
+                  TripCardSkeleton(),
+                  TripCardSkeleton(),
+                ]),
+              ),
             ),
-            error: (err, stack) =>
-                SliverFillRemaining(child: Center(child: Text(ErrorHandler.getUserFriendlyMessage(err)))),
+            error: (err, stack) => SliverFillRemaining(
+              child: Center(
+                child: Text(ErrorHandler.getUserFriendlyMessage(err)),
+              ),
+            ),
           ),
         ],
       ),
@@ -173,7 +186,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
         onPressed: () {
           _showAddTripDialog(context, ref);
         },
-        backgroundColor: AppDesign.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('New Trip', style: TextStyle(color: Colors.white)),
       ),
@@ -188,9 +201,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     return tripsAsync.maybeWhen(
       data: (trips) {
         final activeCount = trips.where((t) => t.status == 'Active').length;
-        final inProcessCount = trips
-            .where((t) => t.status == 'In-process')
-            .length;
+        final inProcessCount =
+            trips.where((t) => t.status == 'In-process').length;
         final settledCount = trips.where((t) => t.status == 'Settled').length;
 
         return _GroupedStatCard(
@@ -216,7 +228,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
       if (grouped.containsKey(status)) {
         grouped[status]!.add(trip);
       } else {
-        // Handle unexpected statuses - add to appropriate category or default
         grouped['Active']!.add(trip);
       }
     }
@@ -226,74 +237,6 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
 
   void _showAddTripDialog(BuildContext context, WidgetRef ref) {
     showDialog(context: context, builder: (ctx) => const TripFormDialog());
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final String svgPath;
-  final Color color;
-
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.svgPath,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-      decoration: AppDesign.cardDecoration(
-        borderRadius: AppDesign.itemBorderRadius,
-      ).copyWith(
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(AppDesign.smallBorderRadius + 2),
-            ),
-            child: PremiumIcon(svgPath: svgPath, color: color, size: 20),
-          ),
-          const Gap(10),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: AppTextStyles.headline2.copyWith(
-                    fontSize: 18,
-                    height: 1.1,
-                  ),
-                ),
-                Text(
-                  label,
-                  style: AppTextStyles.bodySmall.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -310,14 +253,17 @@ class _GroupedStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context.isDarkMode;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppDesign.cardDecoration(
+        context: context,
         borderRadius: AppDesign.itemBorderRadius,
       ).copyWith(
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -327,30 +273,33 @@ class _GroupedStatCard extends StatelessWidget {
         children: [
           Expanded(
             child: _buildStatItem(
+              context: context,
               value: activeCount.toString(),
               label: 'Active',
-              color: AppDesign.primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           Container(
             width: 1,
             height: 40,
-            color: AppDesign.borderDefault,
+            color: AppDesign.borderOf(context),
           ),
           Expanded(
             child: _buildStatItem(
+              context: context,
               value: inProcessCount.toString(),
               label: 'Submitted',
-              color: AppDesign.textSecondary,
+              color: AppDesign.textSecondaryOf(context),
             ),
           ),
           Container(
             width: 1,
             height: 40,
-            color: AppDesign.borderDefault,
+            color: AppDesign.borderOf(context),
           ),
           Expanded(
             child: _buildStatItem(
+              context: context,
               value: settledCount.toString(),
               label: 'Settled',
               color: AppDesign.success,
@@ -362,6 +311,7 @@ class _GroupedStatCard extends StatelessWidget {
   }
 
   Widget _buildStatItem({
+    required BuildContext context,
     required String value,
     required String label,
     required Color color,
@@ -371,7 +321,7 @@ class _GroupedStatCard extends StatelessWidget {
       children: [
         Text(
           value,
-          style: AppTextStyles.headline2.copyWith(
+          style: AppTextStyles.headline2Of(context).copyWith(
             fontSize: 20,
             height: 1.1,
             color: color,
@@ -380,9 +330,9 @@ class _GroupedStatCard extends StatelessWidget {
         const Gap(4),
         Text(
           label,
-          style: AppTextStyles.bodySmall.copyWith(
+          style: AppTextStyles.bodySmallOf(context).copyWith(
             fontWeight: FontWeight.w600,
-            color: AppDesign.textSecondary,
+            color: AppDesign.textSecondaryOf(context),
           ),
           textAlign: TextAlign.center,
           maxLines: 1,
@@ -401,7 +351,7 @@ class _CollapsibleStatusPanel extends StatelessWidget {
   final bool isExpanded;
   final ValueChanged<bool> onExpansionChanged;
   final Color color;
-  final int startIndex; // For maintaining animation index
+  final int startIndex;
 
   const _CollapsibleStatusPanel({
     required this.status,
@@ -417,7 +367,7 @@ class _CollapsibleStatusPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppDesign.surfaceElevated,
+        color: AppDesign.surfaceElevatedOf(context),
         borderRadius: BorderRadius.circular(AppDesign.cardBorderRadius),
         border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
@@ -435,28 +385,29 @@ class _CollapsibleStatusPanel extends StatelessWidget {
                 vertical: 10,
               ),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.05),
+                color: color.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(AppDesign.itemBorderRadius),
               ),
               child: Row(
                 children: [
                   Text(
                     statusLabel,
-                    style: AppTextStyles.bodyLarge.copyWith(
+                    style: AppTextStyles.bodyLargeOf(context).copyWith(
                       fontWeight: FontWeight.w700,
                       color: color,
                     ),
                   ),
                   const Gap(8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
+                      color: color.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: Text(
                       trips.length.toString(),
-                      style: AppTextStyles.bodySmall.copyWith(
+                      style: AppTextStyles.bodySmallOf(context).copyWith(
                         fontWeight: FontWeight.w600,
                         color: color,
                       ),
@@ -484,13 +435,11 @@ class _CollapsibleStatusPanel extends StatelessWidget {
                         final index = entry.key;
                         final trip = entry.value;
                         final isLast = index == trips.length - 1;
-                        // Remove bottom margin from last card to match container padding (8px)
-                        // TripCard has bottom margin of 16px, so we pass margin: null and use EdgeInsets.zero
                         return TripCard(
                           trip: trip,
                           index: startIndex + index,
-                          showStatusBadge: false, // Hide badge since trips are grouped by status
-                          margin: isLast ? EdgeInsets.zero : null, // Remove margin for last card
+                          showStatusBadge: false,
+                          margin: isLast ? EdgeInsets.zero : null,
                         )
                             .animate()
                             .fadeIn(duration: 400.ms, delay: (50 * index).ms)

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'app_design.dart';
 
-/// A custom widget to render Heroicons with standard premium styling.
+/// A custom widget to render Heroicons with standard premium styling in Light and Dark modes.
 class PremiumIcon extends StatelessWidget {
   final String svgPath;
   final double size;
@@ -16,8 +17,9 @@ class PremiumIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Default color is Slate 800 (0xFF1E293B) if not provided.
-    final iconColor = color ?? const Color(0xFF1E293B);
+    // Dynamic color fallback: adapts to ambient theme or textPrimaryOf(context)
+    final iconColor =
+        color ?? Theme.of(context).iconTheme.color ?? AppDesign.textPrimaryOf(context);
 
     return SvgPicture.string(
       svgPath,

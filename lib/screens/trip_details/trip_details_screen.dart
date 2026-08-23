@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
@@ -21,7 +22,6 @@ import '../../services/gemini_service.dart';
 import '../../providers/gemini_provider.dart';
 import '../../core/utils/image_utils.dart';
 import '../../core/constants/expense_constants.dart';
-import '../../core/constants/expense_icons.dart';
 import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_icons.dart';
@@ -30,6 +30,8 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/services/error_handler.dart';
 import '../../core/utils/permission_utils.dart';
+import '../../widgets/shimmer_loading.dart';
+import 'widgets/trip_list_items.dart';
 
 class TripDetailsScreen extends ConsumerStatefulWidget {
   final Trip trip;
@@ -55,21 +57,22 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     final dateFormat = DateFormat('MMM dd, yyyy');
 
     return Scaffold(
-      backgroundColor: AppDesign.surface,
+      backgroundColor: AppDesign.surfaceOf(context),
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        backgroundColor: AppDesign.surfaceElevatedOf(context),
         title: Row(
           children: [
             PremiumIcon(
               svgPath: AppIcons.map,
               size: 24,
-              color: AppDesign.textPrimary,
+              color: AppDesign.textPrimaryOf(context),
             ),
             const Gap(12),
             Expanded(
               child: Text(
                 _trip.name,
-                style: AppTextStyles.headline2,
+                style: AppTextStyles.headline2Of(context),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -83,7 +86,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                 icon: PremiumIcon(
                   svgPath: AppIcons.ellipsisVertical,
                   size: 24,
-                  color: AppDesign.textPrimary,
+                  color: AppDesign.textPrimaryOf(context),
                 ),
                 onPressed: () => _showActionsMenu(context),
               ),
@@ -102,7 +105,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                   horizontal: AppDesign.screenHorizontalPadding,
                   vertical: 12,
                 ),
-                color: AppDesign.surface,
+                color: AppDesign.surfaceOf(context),
                 child: _buildTripInfoLine(dateFormat),
               ),
             ),
@@ -130,7 +133,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                           style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                color: Colors.grey,
+                                color: AppDesign.textSecondaryOf(context),
                                 letterSpacing: 1.2,
                               ),
                         ),
@@ -148,21 +151,21 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: AppDesign.success.withValues(alpha: 0.1),
+                              color: AppDesign.success.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(AppDesign.smallBorderRadius),
                             ),
                             child: Row(
                               children: [
                                 const Icon(
                                   Icons.check_circle_outline,
-                                  color: Colors.green,
+                                  color: AppDesign.success,
                                   size: 14,
                                 ),
                                 const Gap(4),
                                 Text(
                                   'Submitted ${dateFormat.format(_trip.submittedAt!)}',
                                   style: const TextStyle(
-                                    color: Colors.green,
+                                    color: AppDesign.success,
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -177,21 +180,21 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: AppDesign.textPrimary.withValues(alpha: 0.1),
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(AppDesign.smallBorderRadius),
                             ),
                             child: Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.verified_outlined,
-                                  color: Colors.blue,
+                                  color: Theme.of(context).colorScheme.primary,
                                   size: 14,
                                 ),
                                 const Gap(4),
                                 Text(
                                   'Settled${_trip.submittedAt != null ? ' ${dateFormat.format(_trip.submittedAt!)}' : ''}',
-                                  style: const TextStyle(
-                                    color: Colors.blue,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.primary,
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -238,7 +241,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                     }
 
                     if (allItems.isEmpty) {
-                      return const SliverFillRemaining(
+                      return SliverFillRemaining(
                         hasScrollBody: false,
                         child: Center(
                           child: Column(
@@ -247,12 +250,14 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                               Icon(
                                 Icons.receipt_long_outlined,
                                 size: 64,
-                                color: Colors.grey,
+                                color: AppDesign.textTertiaryOf(context),
                               ),
-                              Gap(16),
+                              const Gap(16),
                               Text(
                                 'No expenses or advances recorded yet',
-                                style: TextStyle(color: Colors.grey),
+                                style: TextStyle(
+                                  color: AppDesign.textTertiaryOf(context),
+                                ),
                               ),
                             ],
                           ),
@@ -263,13 +268,12 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                     if (_trip.status == 'Active') {
                       return SliverReorderableList(
                         itemCount: allItems.length,
-                        onReorder: (oldIndex, newIndex) {
+                        onReorderItem: (oldIndex, newIndex) {
                           final n = expenses.length;
-                          if (oldIndex >= n) return;
+                          if (oldIndex >= n || oldIndex < 0) return;
                           int newIdx = newIndex;
                           if (newIdx >= n) newIdx = n - 1;
                           if (newIdx < 0) newIdx = 0;
-                          if (oldIndex < newIdx) newIdx--;
                           final reordered = List<Expense>.from(expenses);
                           final e = reordered.removeAt(oldIndex);
                           reordered.insert(newIdx, e);
@@ -281,13 +285,13 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                             return ReorderableDelayedDragStartListener(
                               key: ValueKey('expense_${item.expense!.id}'),
                               index: index,
-                              child: _ExpenseListItem(
+                              child: ExpenseListItemWidget(
                                 expense: item.expense!,
                                 onTap: () => _navigateToExpenseDetail(context, item.expense!),
                               ),
                             );
                           } else {
-                            return _AdvanceListItem(
+                            return AdvanceListItemWidget(
                               key: ValueKey('advance_${item.advance!.id}'),
                               advance: item.advance!,
                               onTap: () => _showAdvanceDialog(context, item.advance!),
@@ -301,13 +305,13 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                       delegate: SliverChildBuilderDelegate((context, index) {
                         final item = allItems[index];
                         if (item.isExpense) {
-                          return _ExpenseListItem(
+                          return ExpenseListItemWidget(
                             key: ValueKey('expense_${item.expense!.id}'),
                             expense: item.expense!,
                             onTap: () => _navigateToExpenseDetail(context, item.expense!),
                           );
                         } else {
-                          return _AdvanceListItem(
+                          return AdvanceListItemWidget(
                             key: ValueKey('advance_${item.advance!.id}'),
                             advance: item.advance!,
                             onTap: () => _showAdvanceDialog(context, item.advance!),
@@ -316,16 +320,34 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                       }, childCount: allItems.length),
                     );
                   },
-                  loading: () => const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator()),
+                  loading: () => SliverPadding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppDesign.screenHorizontalPadding,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate(const [
+                        ExpenseCardSkeleton(),
+                        ExpenseCardSkeleton(),
+                        ExpenseCardSkeleton(),
+                      ]),
+                    ),
                   ),
                   error: (err, stack) => SliverFillRemaining(
                     child: Center(child: Text(ErrorHandler.getUserFriendlyMessage(err))),
                   ),
                 );
               },
-              loading: () => const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
+              loading: () => SliverPadding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDesign.screenHorizontalPadding,
+                ),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate(const [
+                    ExpenseCardSkeleton(),
+                    ExpenseCardSkeleton(),
+                    ExpenseCardSkeleton(),
+                  ]),
+                ),
               ),
               error: (err, stack) => SliverFillRemaining(
                 child: Center(child: Text(ErrorHandler.getUserFriendlyMessage(err))),
@@ -391,7 +413,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     }
   }
 
-  void _showActionsMenu(BuildContext context) {
+  Future<void> _showActionsMenu(BuildContext context) async {
     final expensesAsync = ref.read(expensesProvider(_trip.id!));
     final RenderBox button = context.findRenderObject() as RenderBox;
     final RenderBox overlay =
@@ -405,13 +427,13 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
       Offset.zero & overlay.size,
     );
 
-    showMenu<String>(
+    final value = await showMenu<String>(
       context: context,
       position: position,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
       ),
-      color: AppDesign.surfaceElevated,
+      color: AppDesign.surfaceElevatedOf(context),
       elevation: 8,
       items: [
         PopupMenuItem<String>(
@@ -422,7 +444,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
           ),
           child: Builder(
             builder: (context) {
-              final textStyle = AppTextStyles.bodyMedium;
+              final textStyle = AppTextStyles.bodyMediumOf(context);
               final iconSize = textStyle.fontSize! + 2;
               return Row(
                 mainAxisSize: MainAxisSize.min,
@@ -430,7 +452,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                   PremiumIcon(
                     svgPath: AppIcons.edit,
                     size: iconSize,
-                    color: AppDesign.textPrimary,
+                    color: AppDesign.textPrimaryOf(context),
                   ),
                   const Gap(12),
                   Text(
@@ -451,7 +473,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
             ),
             child: Builder(
               builder: (context) {
-                final textStyle = AppTextStyles.bodyMedium;
+                final textStyle = AppTextStyles.bodyMediumOf(context);
                 final iconSize = textStyle.fontSize! + 2;
                 return Row(
                   mainAxisSize: MainAxisSize.min,
@@ -459,7 +481,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                     Icon(
                       Icons.delete_outline,
                       size: iconSize,
-                      color: AppDesign.textPrimary,
+                      color: AppDesign.textPrimaryOf(context),
                     ),
                     const Gap(12),
                     Text(
@@ -479,7 +501,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
           ),
           child: Builder(
             builder: (context) {
-              final textStyle = AppTextStyles.bodyMedium;
+              final textStyle = AppTextStyles.bodyMediumOf(context);
               final iconSize = textStyle.fontSize! + 2;
               return Row(
                 mainAxisSize: MainAxisSize.min,
@@ -487,7 +509,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                   PremiumIcon(
                     svgPath: AppIcons.clock,
                     size: iconSize,
-                    color: AppDesign.textPrimary,
+                    color: AppDesign.textPrimaryOf(context),
                   ),
                   const Gap(12),
                   Text(
@@ -507,7 +529,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
           ),
           child: Builder(
             builder: (context) {
-              final textStyle = AppTextStyles.bodyMedium;
+              final textStyle = AppTextStyles.bodyMediumOf(context);
               final iconSize = textStyle.fontSize! + 2;
               return Row(
                 mainAxisSize: MainAxisSize.min,
@@ -515,7 +537,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                   Icon(
                     Icons.table_chart_outlined,
                     size: iconSize,
-                    color: AppDesign.textPrimary,
+                    color: AppDesign.textPrimaryOf(context),
                   ),
                   const Gap(12),
                   Text(
@@ -535,7 +557,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
           ),
           child: Builder(
             builder: (context) {
-              final textStyle = AppTextStyles.bodyMedium;
+              final textStyle = AppTextStyles.bodyMediumOf(context);
               final iconSize = textStyle.fontSize! + 2;
               return Row(
                 mainAxisSize: MainAxisSize.min,
@@ -543,7 +565,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                   Icon(
                     Icons.picture_as_pdf_outlined,
                     size: iconSize,
-                    color: AppDesign.textPrimary,
+                    color: AppDesign.textPrimaryOf(context),
                   ),
                   const Gap(12),
                   Text(
@@ -556,25 +578,25 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
           ),
         ),
       ],
-    ).then((value) {
-      if (value == null) return;
-      
-      switch (value) {
-        case 'EDIT':
-          _showEditDialog(context);
-          break;
-        case 'DELETE':
-          _showDeleteTripConfirmation(context);
-          break;
-        case 'UPDATE_STATE':
-          _showUpdateStateDialog(context);
-          break;
-        case 'EXCEL':
-        case 'PDF':
-          _handleExport(context, value);
-          break;
-      }
-    });
+    );
+
+    if (value == null || !context.mounted) return;
+    
+    switch (value) {
+      case 'EDIT':
+        _showEditDialog(context);
+        break;
+      case 'DELETE':
+        _showDeleteTripConfirmation(context);
+        break;
+      case 'UPDATE_STATE':
+        _showUpdateStateDialog(context);
+        break;
+      case 'EXCEL':
+      case 'PDF':
+        _handleExport(context, value);
+        break;
+    }
   }
 
   Future<void> _showEditDialog(BuildContext context) async {
@@ -637,7 +659,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
             children: [
               Text(
                 'Update Trip State',
-                style: AppTextStyles.headline2,
+                style: AppTextStyles.headline2Of(context),
               ),
               const Gap(24),
               _StateTimeline(
@@ -728,32 +750,32 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
       children: [
         Text(
           dateRange,
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppDesign.textSecondary,
+          style: AppTextStyles.bodyMediumOf(context).copyWith(
+            color: AppDesign.textSecondaryOf(context),
           ),
         ),
         Text(
           ' | ',
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppDesign.textTertiary,
+          style: AppTextStyles.bodyMediumOf(context).copyWith(
+            color: AppDesign.textTertiaryOf(context),
           ),
         ),
         Text(
           locationsText,
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppDesign.textSecondary,
+          style: AppTextStyles.bodyMediumOf(context).copyWith(
+            color: AppDesign.textSecondaryOf(context),
           ),
         ),
         Text(
           ' | ',
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppDesign.textTertiary,
+          style: AppTextStyles.bodyMediumOf(context).copyWith(
+            color: AppDesign.textTertiaryOf(context),
           ),
         ),
         Text(
           currentStatus,
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppDesign.textSecondary,
+          style: AppTextStyles.bodyMediumOf(context).copyWith(
+            color: AppDesign.textSecondaryOf(context),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -766,9 +788,10 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     final advances = ref.read(advancesProvider(_trip.id!)).value ?? [];
 
     try {
-      if ((type == 'EXCEL' || type == 'PDF') && Platform.isAndroid) {
+      if ((type == 'EXCEL' || type == 'PDF') && !kIsWeb && Platform.isAndroid) {
         await Permission.manageExternalStorage.request();
       }
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Generating $type...'),
@@ -791,7 +814,9 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
         fileType = 'PDF';
         filePath = await service.exportToPdf(_trip, expenses, userProfile: userProfile);
       } else if (type == 'REOPEN') {
-        await _showReopenDialog(context);
+        if (context.mounted) {
+          await _showReopenDialog(context);
+        }
         return;
       } else {
         return;
@@ -805,6 +830,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
             filePath: filePath,
             fileType: fileType,
           );
+          if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('$fileType saved. Tap the notification to open $fileName'),
@@ -907,70 +933,6 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     );
   }
 
-  Widget _buildExportPillButton(BuildContext context) {
-    return Builder(
-      builder: (context) {
-        return OutlinedButton.icon(
-          onPressed: () {
-            final RenderBox button = context.findRenderObject() as RenderBox;
-            final RenderBox overlay =
-                Overlay.of(context).context.findRenderObject() as RenderBox;
-            final RelativeRect position = RelativeRect.fromRect(
-              Rect.fromPoints(
-                button.localToGlobal(Offset.zero, ancestor: overlay),
-                button.localToGlobal(button.size.bottomRight(Offset.zero),
-                    ancestor: overlay),
-              ),
-              Offset.zero & overlay.size,
-            );
-            showMenu<String>(
-              context: context,
-              position: position,
-              items: [
-                const PopupMenuItem(
-                  value: 'EXCEL',
-                  child: Row(
-                    children: [
-                      Icon(Icons.table_chart_outlined, size: 18),
-                      Gap(8),
-                      Text('Export Excel'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'PDF',
-                  child: Row(
-                    children: [
-                      Icon(Icons.picture_as_pdf_outlined, size: 18),
-                      Gap(8),
-                      Text('Export PDF'),
-                    ],
-                  ),
-                ),
-              ],
-            ).then((value) {
-              if (value != null) {
-                _handleExport(context, value);
-              }
-            });
-          },
-          icon: const PremiumIcon(svgPath: AppIcons.download),
-          label: const Text('Export Report'),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            side: BorderSide(
-              color: AppDesign.primary.withValues(alpha: 0.3),
-            ),
-            foregroundColor: AppDesign.primary,
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildSummaryCard(
     BuildContext context,
     AsyncValue<List<Expense>> expensesAsync,
@@ -992,14 +954,16 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
 
     // If no advances, show single card with only Expenses
     if (totalAdvances == 0) {
+      final isDark = context.isDarkMode;
       return Container(
         padding: const EdgeInsets.all(24),
         decoration: AppDesign.cardDecoration(
+          context: context,
           borderRadius: AppDesign.cardBorderRadius,
         ).copyWith(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.02),
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -1010,10 +974,10 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppDesign.success.withValues(alpha: 0.1),
+                color: AppDesign.success.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.account_balance_wallet_rounded,
                 color: AppDesign.success,
                 size: 28,
@@ -1025,18 +989,18 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
               children: [
                 Text(
                   'TOTAL SPENT',
-                  style: AppTextStyles.caption.copyWith(
+                  style: AppTextStyles.captionOf(context).copyWith(
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.1,
                   ),
                 ),
-              const Gap(4),
-              Text(
-                '₹ ${NumberFormat('#,##,##0').format(totalExpenses.round())}',
-                style: AppTextStyles.headline1.copyWith(
-                  fontSize: 28,
+                const Gap(4),
+                Text(
+                  '₹ ${NumberFormat('#,##,##0').format(totalExpenses.round())}',
+                  style: AppTextStyles.headline1Of(context).copyWith(
+                    fontSize: 28,
+                  ),
                 ),
-              ),
               ],
             ),
           ],
@@ -1080,7 +1044,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
             children: [
               Text(
                 'Add Advance',
-                style: AppTextStyles.headline2,
+                style: AppTextStyles.headline2Of(context),
                 textAlign: TextAlign.center,
               ),
               const Gap(24),
@@ -1090,58 +1054,85 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-              TextField(
-                controller: amountController,
-                decoration: InputDecoration(
-                  labelText: 'Amount (₹)',
-                  hintText: 'Enter advance amount',
-                  prefixIcon: const Icon(Icons.currency_rupee),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
-                  ),
-                ),
-                keyboardType: TextInputType.number,
-                style: AppTextStyles.bodyMedium,
-              ),
-              const Gap(16),
-              TextField(
-                controller: dateController,
-                decoration: InputDecoration(
-                  labelText: 'Date',
-                  prefixIcon: const Icon(Icons.calendar_today),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
-                  ),
-                ),
-                readOnly: true,
-                onTap: () async {
-                  final pickedDate = await showDatePicker(
-                    context: ctx,
-                    initialDate: selectedDate,
-                    firstDate: _trip.startDate.subtract(const Duration(days: 365)),
-                    lastDate: DateTime.now().add(const Duration(days: 365)),
-                  );
-                  if (pickedDate != null) {
-                    selectedDate = pickedDate;
-                    dateController.text = dateFormat.format(selectedDate);
-                  }
-                },
-                style: AppTextStyles.bodyMedium,
-              ),
-              const Gap(16),
-              TextField(
-                controller: notesController,
-                decoration: InputDecoration(
-                  labelText: 'Notes (Optional)',
-                  hintText: 'Add any additional notes',
-                  prefixIcon: const Icon(Icons.note_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
-                  ),
-                ),
-                maxLines: 3,
-                style: AppTextStyles.bodyMedium,
-              ),
+                      TextField(
+                        controller: amountController,
+                        decoration: InputDecoration(
+                          labelText: 'Amount (₹)',
+                          hintText: 'Enter advance amount',
+                          prefixIcon: const Icon(Icons.currency_rupee),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+                          ),
+                        ),
+                        keyboardType: TextInputType.number,
+                        style: AppTextStyles.bodyMediumOf(context),
+                      ),
+                      const Gap(16),
+                      TextField(
+                        controller: dateController,
+                        decoration: InputDecoration(
+                          labelText: 'Date',
+                          prefixIcon: const Icon(Icons.calendar_today),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+                          ),
+                        ),
+                        readOnly: true,
+                        onTap: () async {
+                          final pickedDate = await showDatePicker(
+                            context: ctx,
+                            initialDate: selectedDate,
+                            firstDate: _trip.startDate.subtract(const Duration(days: 365)),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (pickedDate != null) {
+                            selectedDate = pickedDate;
+                            dateController.text = dateFormat.format(selectedDate);
+                          }
+                        },
+                        style: AppTextStyles.bodyMediumOf(context),
+                      ),
+                      const Gap(16),
+                      TextField(
+                        controller: notesController,
+                        decoration: InputDecoration(
+                          labelText: 'Notes (Optional)',
+                          hintText: 'Add any additional notes',
+                          prefixIcon: const Icon(Icons.note_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+                          ),
+                        ),
+                        maxLines: 3,
+                        style: AppTextStyles.bodyMediumOf(context),
+                      ),
                     ],
                   ),
                 ),
@@ -1247,7 +1238,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
             children: [
               Text(
                 'View/Edit Advance',
-                style: AppTextStyles.headline2,
+                style: AppTextStyles.headline2Of(context),
                 textAlign: TextAlign.center,
               ),
               const Gap(24),
@@ -1265,10 +1256,19 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                           prefixIcon: const Icon(Icons.currency_rupee),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
                           ),
                         ),
                         keyboardType: TextInputType.number,
-                        style: AppTextStyles.bodyMedium,
+                        style: AppTextStyles.bodyMediumOf(context),
                         enabled: _trip.status == 'Active',
                       ),
                       const Gap(16),
@@ -1279,6 +1279,15 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                           prefixIcon: const Icon(Icons.calendar_today),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
                           ),
                         ),
                         readOnly: true,
@@ -1294,7 +1303,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                             dateController.text = dateFormat.format(selectedDate);
                           }
                         } : null,
-                        style: AppTextStyles.bodyMedium,
+                        style: AppTextStyles.bodyMediumOf(context),
                       ),
                       const Gap(16),
                       TextField(
@@ -1305,10 +1314,19 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                           prefixIcon: const Icon(Icons.note_outlined),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: AppDesign.borderOf(context)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+                            borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
                           ),
                         ),
                         maxLines: 3,
-                        style: AppTextStyles.bodyMedium,
+                        style: AppTextStyles.bodyMediumOf(context),
                         enabled: _trip.status == 'Active',
                       ),
                     ],
@@ -1498,14 +1516,14 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: AppDesign.borderOf(context),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 const Gap(12),
                 Text(
                   'AI Scan Source',
-                  style: AppTextStyles.headline2.copyWith(
+                  style: AppTextStyles.headline2Of(context).copyWith(
                     fontSize: 18,
                   ),
                 ),
@@ -1524,14 +1542,14 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                   ),
                   title: Text(
                     'Smart Scan (Camera or Gallery)',
-                    style: AppTextStyles.bodyMedium,
+                    style: AppTextStyles.bodyMediumOf(context),
                   ),
                   onTap: () async {
                     final cameraGranted = await PermissionUtils.requestCamera(parentContext);
-                    if (!cameraGranted) return;
+                    if (!cameraGranted || !parentContext.mounted) return;
                     final galleryGranted = await PermissionUtils.requestGallery(parentContext);
-                    if (!galleryGranted) return;
-                    final paths = await ImageUtils.scanDocument(context);
+                    if (!galleryGranted || !parentContext.mounted) return;
+                    final paths = await ImageUtils.scanDocument(parentContext);
                     if (ctx.mounted) Navigator.pop(ctx, paths);
                   },
                 ),
@@ -1549,11 +1567,11 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                   ),
                   title: Text(
                     'Upload PDF Document',
-                    style: AppTextStyles.bodyMedium,
+                    style: AppTextStyles.bodyMediumOf(context),
                   ),
                   onTap: () async {
                     final granted = await PermissionUtils.requestStorageForFiles(parentContext);
-                    if (!granted) return;
+                    if (!granted || !parentContext.mounted) return;
                     final paths = await ImageUtils.pickPdfAndConvert();
                     if (ctx.mounted) Navigator.pop(ctx, paths);
                   },
@@ -1581,7 +1599,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                 const Gap(16),
                 Text(
                   'AI Analyzing Bill...',
-                  style: AppTextStyles.bodyLarge.copyWith(
+                  style: AppTextStyles.bodyLargeOf(context).copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1592,6 +1610,9 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
       ),
     );
 
+    final modelAsync = ref.read(geminiModelProvider);
+    final selectedModel = modelAsync.value;
+
     final geminiService = GeminiService();
     // Send first 2 pages (e.g. PDF) so from/to can be read from itinerary
     final result = await geminiService.analyzeBill(
@@ -1600,6 +1621,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
       availableHeads: ExpenseConstants.heads,
       availableSubHeads: ExpenseConstants.subHeads,
       tripLocations: _trip.cities,
+      modelName: selectedModel,
     );
 
     if (!context.mounted) return;
@@ -1623,8 +1645,8 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     );
   }
 
-  void _navigateToExpenseDetail(BuildContext context, Expense expense) {
-    Navigator.push(
+  Future<void> _navigateToExpenseDetail(BuildContext context, Expense expense) async {
+    final shouldEdit = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) => ExpenseDetailViewScreen(
@@ -1632,12 +1654,10 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
           trip: _trip,
         ),
       ),
-    ).then((shouldEdit) {
-      // If detail view returns true, navigate to edit
-      if (shouldEdit == true && _trip.status == 'Active') {
-        _navigateToEditExpense(context, expense);
-      }
-    });
+    );
+    if (shouldEdit == true && _trip.status == 'Active' && context.mounted) {
+      _navigateToEditExpense(context, expense);
+    }
   }
 
   void _navigateToEditExpense(BuildContext context, Expense expense) {
@@ -1707,6 +1727,8 @@ class _StateTimeline extends StatelessWidget {
       return false;
     }
 
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1726,14 +1748,14 @@ class _StateTimeline extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: isPast
-                        ? AppDesign.primary
-                        : AppDesign.borderDefault,
+                        ? primaryColor
+                        : AppDesign.borderOf(context),
                     border: isCurrent
-                        ? Border.all(color: AppDesign.primary, width: 3)
+                        ? Border.all(color: primaryColor, width: 3)
                         : null,
                   ),
                   child: isPast && !isCurrent
-                      ? Icon(
+                      ? const Icon(
                           Icons.check,
                           size: 16,
                           color: Colors.white,
@@ -1744,7 +1766,7 @@ class _StateTimeline extends StatelessWidget {
                   Container(
                     width: 2,
                     height: 60,
-                    color: isPast ? AppDesign.primary : AppDesign.borderDefault,
+                    color: isPast ? primaryColor : AppDesign.borderOf(context),
                   ),
               ],
             );
@@ -1780,11 +1802,11 @@ class _StateTimeline extends StatelessWidget {
                               children: [
                                 Text(
                                   status,
-                                  style: AppTextStyles.bodyLarge.copyWith(
+                                  style: AppTextStyles.bodyLargeOf(context).copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: isSelectable || isCurrent
-                                        ? AppDesign.textPrimary
-                                        : AppDesign.textTertiary,
+                                        ? AppDesign.textPrimaryOf(context)
+                                        : AppDesign.textTertiaryOf(context),
                                   ),
                                 ),
                                 if (isCurrent) ...[
@@ -1795,13 +1817,13 @@ class _StateTimeline extends StatelessWidget {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: AppDesign.primary.withValues(alpha: 0.1),
+                                      color: primaryColor.withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
                                       'Current',
-                                      style: AppTextStyles.caption.copyWith(
-                                        color: AppDesign.primary,
+                                      style: AppTextStyles.captionOf(context).copyWith(
+                                        color: primaryColor,
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -1813,16 +1835,16 @@ class _StateTimeline extends StatelessWidget {
                               const Gap(4),
                               Text(
                                 dateFormat.format(timestamp),
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppDesign.textSecondary,
+                                style: AppTextStyles.bodySmallOf(context).copyWith(
+                                  color: AppDesign.textSecondaryOf(context),
                                 ),
                               ),
                             ] else if (!isPast) ...[
                               const Gap(4),
                               Text(
                                 'Not yet updated',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppDesign.textTertiary,
+                                style: AppTextStyles.bodySmallOf(context).copyWith(
+                                  color: AppDesign.textTertiaryOf(context),
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),
@@ -1834,7 +1856,7 @@ class _StateTimeline extends StatelessWidget {
                         Icon(
                           Icons.arrow_forward_ios,
                           size: 16,
-                          color: AppDesign.primary,
+                          color: primaryColor,
                         ),
                     ],
                   ),
@@ -1863,231 +1885,6 @@ class _ListItemWrapper {
         isExpense = false;
 }
 
-class _ExpenseListItem extends StatelessWidget {
-  final Expense expense;
-  final VoidCallback? onTap;
-
-  const _ExpenseListItem({
-    required this.expense,
-    this.onTap,
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd MMM');
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _getCategoryColor(expense.head).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    getExpenseIcon(expense.head, expense.subHead),
-                    color: _getCategoryColor(expense.head),
-                    size: 20,
-                  ),
-                ),
-              const Gap(10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      expense.subHead ?? expense.head,
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Gap(2),
-                    Text(
-                      '${dateFormat.format(expense.startDate).toUpperCase()} • ${expense.city}${expense.toCity != null && expense.toCity != expense.city ? ' \u2192 ${expense.toCity}' : ''}',
-                      style: AppTextStyles.bodySmall,
-                    ),
-                    if (expense.notes != null && expense.notes!.trim().isNotEmpty) ...[
-                      const Gap(2),
-                      Text(
-                        expense.notes!.trim(),
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppDesign.textTertiary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '₹ ${expense.amount.toStringAsFixed(0)}',
-                    style: AppTextStyles.headline2.copyWith(
-                      fontSize: 16,
-                    ),
-                  ),
-                  const Gap(2),
-                  _buildAttachmentIcon(expense.billPaths),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-    );
-  }
-
-  Widget _buildAttachmentIcon(List<String> paths) {
-    if (paths.isEmpty) {
-      return Icon(
-        Icons.file_open_outlined,
-        size: 12,
-        color: AppDesign.borderDefault,
-      );
-    }
-
-    final path = paths.first;
-    IconData icon;
-    Color color;
-
-    if (path.toLowerCase().endsWith('.pdf')) {
-      icon = Icons.picture_as_pdf_outlined;
-      color = AppDesign.error;
-    } else {
-      icon = paths.length > 1
-          ? Icons.collections_outlined
-          : Icons.image_outlined;
-      color = AppDesign.primary;
-    }
-
-    return Icon(icon, size: 12, color: color);
-  }
-
-  Color _getCategoryColor(String head) {
-    switch (head) {
-      case 'Travel':
-        return AppDesign.categoryTravel;
-      case 'Accommodation':
-        return AppDesign.categoryAccommodation;
-      case 'Food':
-        return AppDesign.categoryFood;
-      case 'Event':
-        return AppDesign.categoryEvent;
-      default:
-        return AppDesign.categoryMisc;
-    }
-  }
-}
-
-class _AdvanceListItem extends StatelessWidget {
-  final Advance advance;
-  final VoidCallback? onTap;
-
-  const _AdvanceListItem({
-    required this.advance,
-    this.onTap,
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd MMM');
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppDesign.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.payments_outlined,
-                  color: AppDesign.primary,
-                  size: 20,
-                ),
-              ),
-              const Gap(10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Advance',
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const Gap(2),
-                    Text(
-                      dateFormat.format(advance.date).toUpperCase(),
-                      style: AppTextStyles.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '₹ ${advance.amount.round()}',
-                    style: AppTextStyles.headline2.copyWith(
-                      fontSize: 16,
-                    ),
-                  ),
-                  if (advance.notes != null && advance.notes!.isNotEmpty) ...[
-                    const Gap(2),
-                    Icon(
-                      Icons.notes_rounded,
-                      size: 12,
-                      color: AppDesign.textTertiary,
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _GroupedSummaryCard extends StatelessWidget {
   final double expenses;
   final double advances;
@@ -2101,14 +1898,17 @@ class _GroupedSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context.isDarkMode;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: AppDesign.cardDecoration(
+        context: context,
         borderRadius: AppDesign.cardBorderRadius,
       ).copyWith(
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -2118,6 +1918,7 @@ class _GroupedSummaryCard extends StatelessWidget {
         children: [
           Expanded(
             child: _buildStatItem(
+              context: context,
               value: '₹ ${NumberFormat('#,##,##0').format(expenses.round())}',
               label: 'Expenses',
               color: AppDesign.success,
@@ -2126,22 +1927,24 @@ class _GroupedSummaryCard extends StatelessWidget {
           Container(
             width: 1,
             height: 40,
-            color: AppDesign.borderDefault,
+            color: AppDesign.borderOf(context),
           ),
           Expanded(
             child: _buildStatItem(
+              context: context,
               value: '₹ ${NumberFormat('#,##,##0').format(advances.round())}',
               label: 'Advances',
-              color: AppDesign.primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           Container(
             width: 1,
             height: 40,
-            color: AppDesign.borderDefault,
+            color: AppDesign.borderOf(context),
           ),
           Expanded(
             child: _buildStatItem(
+              context: context,
               value: '₹ ${NumberFormat('#,##,##0').format(totalDue.round())}',
               label: 'Total Due',
               color: totalDue < 0 ? AppDesign.error : AppDesign.success,
@@ -2153,6 +1956,7 @@ class _GroupedSummaryCard extends StatelessWidget {
   }
 
   Widget _buildStatItem({
+    required BuildContext context,
     required String value,
     required String label,
     required Color color,
@@ -2162,7 +1966,7 @@ class _GroupedSummaryCard extends StatelessWidget {
       children: [
         Text(
           value,
-          style: AppTextStyles.headline2.copyWith(
+          style: AppTextStyles.headline2Of(context).copyWith(
             fontSize: 20,
             height: 1.1,
             color: color,
@@ -2171,9 +1975,9 @@ class _GroupedSummaryCard extends StatelessWidget {
         const Gap(4),
         Text(
           label,
-          style: AppTextStyles.bodySmall.copyWith(
+          style: AppTextStyles.bodySmallOf(context).copyWith(
             fontWeight: FontWeight.w600,
-            color: AppDesign.textSecondary,
+            color: AppDesign.textSecondaryOf(context),
           ),
           textAlign: TextAlign.center,
           maxLines: 1,

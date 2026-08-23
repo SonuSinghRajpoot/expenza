@@ -38,24 +38,24 @@ class _ExpenseDetailViewScreenState
     final dateFormat = DateFormat('dd MMM yyyy');
 
     return Scaffold(
-      backgroundColor: AppDesign.surface,
+      backgroundColor: AppDesign.surfaceOf(context),
       appBar: AppBar(
-        backgroundColor: AppDesign.surfaceElevated,
+        backgroundColor: AppDesign.surfaceElevatedOf(context),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppDesign.textPrimary),
+          icon: Icon(Icons.arrow_back, color: AppDesign.textPrimaryOf(context)),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Expense Details',
-          style: AppTextStyles.headline2,
+          style: AppTextStyles.headline2Of(context),
         ),
         actions: widget.trip.status == 'Active'
             ? [
                 Padding(
                   padding: const EdgeInsets.only(right: 16.0),
                   child: OutlinedButton(
-                    onPressed: () => _deleteExpense(context),
+                    onPressed: _deleteExpense,
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       shape: RoundedRectangleBorder(
@@ -160,15 +160,17 @@ class _ExpenseDetailViewScreenState
   Widget _buildHeaderCard(Expense expense) {
     final categoryColor = _getCategoryColor(expense.head);
     final categoryIcon = getExpenseIcon(expense.head, expense.subHead);
+    final isDark = context.isDarkMode;
 
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: AppDesign.cardDecoration(
+        context: context,
         borderRadius: AppDesign.itemBorderRadius,
       ).copyWith(
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -179,7 +181,7 @@ class _ExpenseDetailViewScreenState
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: categoryColor.withValues(alpha: 0.1),
+              color: categoryColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
@@ -195,14 +197,14 @@ class _ExpenseDetailViewScreenState
               children: [
                 Text(
                   expense.subHead ?? expense.head,
-                  style: AppTextStyles.headline2.copyWith(
+                  style: AppTextStyles.headline2Of(context).copyWith(
                     fontSize: 20,
                   ),
                 ),
                 const Gap(4),
                 Text(
                   '₹ ${expense.amount.toStringAsFixed(2)}',
-                  style: AppTextStyles.headline1.copyWith(
+                  style: AppTextStyles.headline1Of(context).copyWith(
                     fontSize: 24,
                     fontWeight: FontWeight.w600,
                     color: categoryColor,
@@ -219,6 +221,7 @@ class _ExpenseDetailViewScreenState
   Widget _buildSection(String title, List<Widget> children) {
     return Container(
       decoration: AppDesign.cardDecoration(
+        context: context,
         borderRadius: AppDesign.itemBorderRadius,
       ),
       child: Column(
@@ -228,12 +231,12 @@ class _ExpenseDetailViewScreenState
             padding: const EdgeInsets.all(20),
             child: Text(
               title,
-              style: AppTextStyles.bodyLarge.copyWith(
+              style: AppTextStyles.bodyLargeOf(context).copyWith(
                 fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          const Divider(height: 1, color: AppDesign.borderDefault),
+          Divider(height: 1, color: AppDesign.borderOf(context)),
           ...children,
         ],
       ),
@@ -250,10 +253,10 @@ class _ExpenseDetailViewScreenState
             flex: 2,
             child: Text(
               label,
-              style: AppTextStyles.bodyMedium.copyWith(
+              style: AppTextStyles.bodyMediumOf(context).copyWith(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: AppDesign.textSecondary,
+                color: AppDesign.textSecondaryOf(context),
               ),
             ),
           ),
@@ -261,7 +264,7 @@ class _ExpenseDetailViewScreenState
             flex: 3,
             child: Text(
               value,
-              style: AppTextStyles.bodyMedium.copyWith(
+              style: AppTextStyles.bodyMediumOf(context).copyWith(
                 fontWeight: isAmount ? FontWeight.w600 : FontWeight.w500,
               ),
               textAlign: TextAlign.end,
@@ -275,6 +278,7 @@ class _ExpenseDetailViewScreenState
   Widget _buildEvidenceSection(List<String> billPaths) {
     return Container(
       decoration: AppDesign.cardDecoration(
+        context: context,
         borderRadius: AppDesign.itemBorderRadius,
       ),
       child: Column(
@@ -286,14 +290,14 @@ class _ExpenseDetailViewScreenState
               children: [
                 Text(
                   'Evidence (${billPaths.length})',
-                  style: AppTextStyles.bodyLarge.copyWith(
+                  style: AppTextStyles.bodyLargeOf(context).copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: AppDesign.borderDefault),
+          Divider(height: 1, color: AppDesign.borderOf(context)),
           Padding(
             padding: const EdgeInsets.all(20),
             child: Wrap(
@@ -321,8 +325,8 @@ class _ExpenseDetailViewScreenState
         height: 160,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
-          border: Border.all(color: AppDesign.borderDefault),
-          color: AppDesign.surface,
+          border: Border.all(color: AppDesign.borderOf(context)),
+          color: AppDesign.surfaceOf(context),
         ),
         child: Stack(
           children: [
@@ -341,15 +345,15 @@ class _ExpenseDetailViewScreenState
                     )
                   : _isBillFileMissing(path)
                       ? Container(
-                          color: Colors.grey.shade200,
+                          color: AppDesign.surfaceElevatedOf(context),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.broken_image, size: 48),
+                              Icon(Icons.broken_image, size: 48, color: AppDesign.textTertiaryOf(context)),
                               const Gap(8),
                               Text(
                                 'No longer available',
-                                style: AppTextStyles.bodySmall.copyWith(fontSize: 11),
+                                style: AppTextStyles.bodySmallOf(context).copyWith(fontSize: 11),
                               ),
                             ],
                           ),
@@ -361,8 +365,8 @@ class _ExpenseDetailViewScreenState
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
                             return Container(
-                              color: Colors.grey.shade200,
-                              child: const Icon(Icons.broken_image, size: 48),
+                              color: AppDesign.surfaceElevatedOf(context),
+                              child: Icon(Icons.broken_image, size: 48, color: AppDesign.textTertiaryOf(context)),
                             );
                           },
                         ),
@@ -382,7 +386,7 @@ class _ExpenseDetailViewScreenState
                   ),
                   child: Text(
                     '${index + 1}/$total',
-                    style: AppTextStyles.bodySmall.copyWith(
+                    style: AppTextStyles.bodySmallOf(context).copyWith(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -423,8 +427,9 @@ class _ExpenseDetailViewScreenState
                     ? Container(
                         padding: EdgeInsets.all(AppDesign.screenHorizontalPadding * 2),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppDesign.surfaceElevatedOf(context),
                           borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppDesign.borderOf(context)),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -437,14 +442,14 @@ class _ExpenseDetailViewScreenState
                             const Gap(16),
                             Text(
                               'PDF Document',
-                              style: AppTextStyles.bodyLarge.copyWith(
+                              style: AppTextStyles.bodyLargeOf(context).copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             const Gap(8),
                             Text(
                               path.split(RegExp(r'[/\\]')).last,
-                              style: AppTextStyles.bodySmall,
+                              style: AppTextStyles.bodySmallOf(context),
                               textAlign: TextAlign.center,
                             ),
                           ],
@@ -453,17 +458,18 @@ class _ExpenseDetailViewScreenState
                     : Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppDesign.surfaceElevatedOf(context),
                           borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppDesign.borderOf(context)),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.broken_image, size: 64),
+                            Icon(Icons.broken_image, size: 64, color: AppDesign.textTertiaryOf(context)),
                             const Gap(12),
                             Text(
                               'Image no longer available',
-                              style: AppTextStyles.bodyMedium,
+                              style: AppTextStyles.bodyMediumOf(context),
                             ),
                           ],
                         ),
@@ -521,7 +527,7 @@ class _ExpenseDetailViewScreenState
     }
   }
 
-  Future<void> _deleteExpense(BuildContext context) async {
+  Future<void> _deleteExpense() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -612,12 +618,6 @@ class _ImageViewerDialogState extends State<_ImageViewerDialog> {
     return _transformationControllers[index]!;
   }
 
-  bool _isZoomed(int index) {
-    final controller = _transformationControllers[index];
-    if (controller == null) return false;
-    return controller.value.getMaxScaleOnAxis() > 1.0;
-  }
-
   @override
   Widget build(BuildContext context) {
     final safePadding = MediaQuery.of(context).padding;
@@ -644,17 +644,17 @@ class _ImageViewerDialogState extends State<_ImageViewerDialog> {
                   child: Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppDesign.surfaceElevatedOf(context),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                        Icon(Icons.broken_image, size: 64, color: AppDesign.textTertiaryOf(context)),
                         const Gap(12),
                         Text(
                           'Image no longer available',
-                          style: AppTextStyles.bodyMedium,
+                          style: AppTextStyles.bodyMediumOf(context),
                         ),
                       ],
                     ),
@@ -677,10 +677,10 @@ class _ImageViewerDialogState extends State<_ImageViewerDialog> {
                       return Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppDesign.surfaceElevatedOf(context),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                        child: Icon(Icons.broken_image, size: 64, color: AppDesign.textTertiaryOf(context)),
                       );
                     },
                   ),
@@ -719,7 +719,7 @@ class _ImageViewerDialogState extends State<_ImageViewerDialog> {
                   ),
                   child: Text(
                     '${_currentIndex + 1} / ${widget.imagePaths.length}',
-                    style: AppTextStyles.bodyMedium.copyWith(
+                    style: AppTextStyles.bodyMediumOf(context).copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w600,
                     ),

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Outer Circular Rim (Reduced by 20% to radius 29dp) -->
+    <path
+        android:strokeColor="#000000"
+        android:strokeWidth="2.0"
+        android:pathData="M54,25 A29,29 0 1,1 53.99,25 Z" />
+
+    <!-- Rupee Icon Glyph (Reduced scale by 20% to 1.76) -->
+    <group
+        android:scaleX="1.76"
+        android:scaleY="1.76"
+        android:pivotX="12"
+        android:pivotY="12"
+        android:translateX="42"
+        android:translateY="42">
+        <path
+            android:strokeColor="#000000"
+            android:strokeWidth="1.6"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M15,8.25H9m6,3H9m3,6-3,-3h1.5a3,3 0 1,0 0,-6M21,12a9,9 0 1,1 -18,0 9,9 0 0,1 18,0Z" />
+    </group>
+</vector>

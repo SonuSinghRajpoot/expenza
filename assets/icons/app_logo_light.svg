@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108" fill="none">
+  <!-- Extended Full-Bleed Background -->
+  <rect width="108" height="108" fill="url(#lightBgGrad)" />
+
+  <!-- Outer Circular Base (Reduced by 20% to r=37) -->
+  <circle cx="54" cy="54" r="37" fill="url(#lightInnerBgGrad)" stroke="url(#lightBorderGrad)" stroke-width="2.2" />
+  
+  <!-- Subtle Inner Ring (r=31) -->
+  <circle cx="54" cy="54" r="31" stroke="#C7D2FE" stroke-width="1.0" stroke-opacity="0.5" />
+
+  <!-- Rupee Symbol & Inner Circle Path (Reduced by 20% to scale 2.4, Centered) -->
+  <g transform="translate(25.2, 25.2) scale(2.4)" stroke="url(#lightStrokeGrad)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M15 8.25H9m6 3H9m3 6-3-3h1.5a3 3 0 1 0 0-6M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+  </g>
+
+  <defs>
+    <!-- Outer Bleed Gradient -->
+    <linearGradient id="lightBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC" />
+      <stop offset="100%" stop-color="#E2E8F0" />
+    </linearGradient>
+
+    <!-- Inner Badge Radial Gradient -->
+    <radialGradient id="lightInnerBgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="70%" stop-color="#F1F5F9" />
+      <stop offset="100%" stop-color="#EEF2FF" />
+    </radialGradient>
+
+    <!-- Outer Border Gradient -->
+    <linearGradient id="lightBorderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CBD5E1" />
+      <stop offset="100%" stop-color="#A5B4FC" />
+    </linearGradient>
+
+    <!-- Rupee Stroke Gradient -->
+    <linearGradient id="lightStrokeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#3730A3" />
+    </linearGradient>
+  </defs>
+</svg>

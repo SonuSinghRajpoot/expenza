@@ -42,6 +42,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = context.isDarkMode;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final unselectedColor = AppDesign.textTertiaryOf(context);
+    final bgColor = AppDesign.surfaceElevatedOf(context);
+
     return Scaffold(
       body: PageView(
         controller: _pageController,
@@ -57,9 +62,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: AppDesign.borderOf(context),
+              width: 1,
+            ),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -69,35 +80,37 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
-          backgroundColor: AppDesign.surfaceElevated,
-          selectedItemColor: AppDesign.primary,
-          unselectedItemColor: AppDesign.textTertiary,
-          selectedLabelStyle: AppTextStyles.bodySmall.copyWith(
+          backgroundColor: bgColor,
+          selectedItemColor: primaryColor,
+          unselectedItemColor: unselectedColor,
+          selectedLabelStyle: AppTextStyles.bodySmallOf(context).copyWith(
             fontWeight: FontWeight.w600,
+            color: primaryColor,
           ),
-          unselectedLabelStyle: AppTextStyles.bodySmall.copyWith(
+          unselectedLabelStyle: AppTextStyles.bodySmallOf(context).copyWith(
             fontWeight: FontWeight.w500,
+            color: unselectedColor,
           ),
           items: [
             BottomNavigationBarItem(
               icon: PremiumIcon(
                 svgPath: AppIcons.expenses,
-                color: AppDesign.textTertiary,
+                color: unselectedColor,
               ),
               activeIcon: PremiumIcon(
                 svgPath: AppIcons.expenses,
-                color: AppDesign.primary,
+                color: primaryColor,
               ),
               label: 'Expenses',
             ),
             BottomNavigationBarItem(
               icon: PremiumIcon(
                 svgPath: AppIcons.account,
-                color: AppDesign.textTertiary,
+                color: unselectedColor,
               ),
               activeIcon: PremiumIcon(
                 svgPath: AppIcons.account,
-                color: AppDesign.primary,
+                color: primaryColor,
               ),
               label: 'Accounts',
             ),

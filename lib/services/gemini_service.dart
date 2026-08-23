@@ -6,6 +6,8 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 import '../core/constants/expense_constants.dart';
+import '../core/utils/ocr_service.dart';
+import '../data/repositories/gemini_repository.dart';
 
 class GeminiService {
   static String _buildLocationBlock(List<String>? tripLocations) {
@@ -27,7 +29,7 @@ class GeminiService {
   }) {
     final subHeadsBlock = _buildSubHeadsBlock(availableSubHeads);
     final multiPageHint = imageCount > 1
-        ? ' Two images (page 1 and 2): fromCity/toCity often on page 2 (itinerary).'
+        ? ' Document spans $imageCount pages/images: itinerary, hotel folios, check-in/out and grand totals may appear on any page.'
         : '';
     return 'Extract from this receipt/document into JSON: head (one of $availableHeads), subHead (MANDATORY: one of SubHeads for the chosen head), amount, date (YYYY-MM-DD), endDate, fromCity, toCity (null if non-travel), pax (number of people; null if not applicable). Do NOT extract notes. $loc\n'
         'SubHeads: $subHeadsBlock\n'
@@ -35,6 +37,23 @@ class GeminiService {
         'Meal: Breakfast 4-12, Lunch 12-16, Snacks 16-19, Dinner 19-4. No time: infer.\n'
         'Merchant logic: Be smart with merchant names. If Uber, Ola, Rapido, BluSmart, or similar cab/bike keywords appear, infer Travel head with Cab or Bike subHead. Swiggy/Zomato -> Food. OYO/MakeMyTrip (hotels) -> Accommodation. Use merchant context to infer appropriate head and subHead from the allowed list.\n'
         'If a field cannot be determined, use null. Do not guess dates or amounts.$multiPageHint';
+  }
+
+  static String _buildTextPrompt(
+    String ocrText,
+    List<String> availableHeads,
+    Map<String, List<String>> availableSubHeads,
+    String loc,
+  ) {
+    final subHeadsBlock = _buildSubHeadsBlock(availableSubHeads);
+    return 'Extract from this receipt text into JSON: head (one of $availableHeads), subHead (MANDATORY: one of SubHeads for the chosen head), amount, date (YYYY-MM-DD), endDate, fromCity, toCity (null if non-travel), pax (number of people; null if not applicable). Do NOT extract notes. $loc\n'
+        'SubHeads: $subHeadsBlock\n'
+        'Amount: Use final total/balance due; if multiple totals, use the grand total.\n'
+        'Meal: Breakfast 4-12, Lunch 12-16, Snacks 16-19, Dinner 19-4. No time: infer.\n'
+        'Merchant logic: Be smart with merchant names. If Uber, Ola, Rapido, BluSmart, or similar cab/bike keywords appear, infer Travel head with Cab or Bike subHead. Swiggy/Zomato -> Food. OYO/MakeMyTrip (hotels) -> Accommodation. Use merchant context to infer appropriate head and subHead from the allowed list.\n'
+        'If a field cannot be determined, use null. Do not guess dates or amounts.\n\n'
+        '--- RECEIPT OCR TEXT ---\n'
+        '$ocrText';
   }
 
   static gai.Schema _buildResponseSchema(List<String> availableHeads) {
@@ -151,23 +170,73 @@ class GeminiService {
     }
   }
 
-  Future<Map<String, dynamic>?> _analyzeFromImage(
+  Future<Map<String, dynamic>?> _analyzeFromText(
     String apiKey,
-    List<String> imagePaths,
+    String ocrText,
     List<String> availableHeads,
     Map<String, List<String>> availableSubHeads,
-    List<String>? tripLocations,
-  ) async {
+    List<String>? tripLocations, {
+    String? modelName,
+  }) async {
     try {
+      final selectedModel = (modelName != null && modelName.trim().isNotEmpty)
+          ? modelName.trim()
+          : GeminiRepository.defaultModel;
+
       final model = gai.GenerativeModel(
-        model: 'gemini-2.5-flash',
+        model: selectedModel,
         apiKey: apiKey,
         generationConfig: gai.GenerationConfig(
           responseMimeType: 'application/json',
           responseSchema: _buildResponseSchema(availableHeads),
         ),
       );
-      final toSend = imagePaths.take(2).toList();
+
+      final prompt = _buildTextPrompt(
+        ocrText,
+        availableHeads,
+        availableSubHeads,
+        _buildLocationBlock(tripLocations),
+      );
+
+      final response = await model.generateContent([
+        gai.Content.text(prompt),
+      ]);
+
+      final rawText = response.text;
+      if (rawText == null || rawText.isEmpty) {
+        return null;
+      }
+      return _parseJsonResponse(rawText);
+    } catch (e) {
+      debugPrint('GeminiService._analyzeFromText error: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _analyzeFromImage(
+    String apiKey,
+    List<String> imagePaths,
+    List<String> availableHeads,
+    Map<String, List<String>> availableSubHeads,
+    List<String>? tripLocations, {
+    String? modelName,
+  }) async {
+    try {
+      final selectedModel = (modelName != null && modelName.trim().isNotEmpty)
+          ? modelName.trim()
+          : GeminiRepository.defaultModel;
+
+      final model = gai.GenerativeModel(
+        model: selectedModel,
+        apiKey: apiKey,
+        generationConfig: gai.GenerationConfig(
+          responseMimeType: 'application/json',
+          responseSchema: _buildResponseSchema(availableHeads),
+        ),
+      );
+      // Support multi-page hotel folios and itinerary tickets up to 6 pages
+      final toSend = imagePaths.take(6).toList();
       final parts = <gai.Part>[gai.TextPart(_buildImagePrompt(
         availableHeads, availableSubHeads,
         _buildLocationBlock(tripLocations),
@@ -191,7 +260,7 @@ class GeminiService {
       final rawText = response.text;
       if (rawText == null || rawText.isEmpty) {
         debugPrint(
-          'GeminiService: empty response. candidates=${response.candidates?.length ?? 0}',
+          'GeminiService: empty response. candidates=${response.candidates.length}',
         );
         return null;
       }
@@ -209,10 +278,118 @@ class GeminiService {
     required List<String> availableHeads,
     required Map<String, List<String>> availableSubHeads,
     List<String>? tripLocations,
+    String? modelName,
   }) async {
     if (imagePaths.isEmpty) return null;
+
+    // Smart Hybrid Pipeline: Try fast on-device OCR first for single printed receipts
+    if (imagePaths.length == 1 && !kIsWeb) {
+      try {
+        final ocrText = await OcrService.extractTextFromImagePath(imagePaths.first);
+        if (ocrText != null && OcrService.isOcrSufficient(ocrText)) {
+          debugPrint('GeminiService: High quality OCR text extracted (${ocrText.length} chars), using fast text prompt');
+          final result = await _analyzeFromText(
+            apiKey,
+            ocrText,
+            availableHeads,
+            availableSubHeads,
+            tripLocations,
+            modelName: modelName,
+          );
+          if (result != null && result['amount'] != null) {
+            return result;
+          }
+          debugPrint('GeminiService: Text analysis incomplete, falling back to Vision');
+        }
+      } catch (e) {
+        debugPrint('GeminiService: OCR check failed ($e), falling back to Vision');
+      }
+    }
+
+    // Multimodal Vision Fallback & Multi-page document handling
     return _analyzeFromImage(
-      apiKey, imagePaths, availableHeads, availableSubHeads, tripLocations,
+      apiKey,
+      imagePaths,
+      availableHeads,
+      availableSubHeads,
+      tripLocations,
+      modelName: modelName,
     );
+  }
+
+  /// Performs a lightweight connectivity test with the given API key and model.
+  /// Sends a minimal "Ping" request to verify authorization, quota, and model existence.
+  Future<({bool success, String message})> testConnection({
+    required String apiKey,
+    String? modelName,
+  }) async {
+    final key = apiKey.trim();
+    if (key.isEmpty) {
+      return (success: false, message: 'API key cannot be empty');
+    }
+
+    final selectedModel = (modelName != null && modelName.trim().isNotEmpty)
+        ? modelName.trim()
+        : GeminiRepository.defaultModel;
+
+    try {
+      final model = gai.GenerativeModel(
+        model: selectedModel,
+        apiKey: key,
+      );
+
+      final response = await model.generateContent([
+        gai.Content.text('Ping'),
+      ]);
+
+      if (response.text != null && response.text!.isNotEmpty) {
+        return (
+          success: true,
+          message: 'Connection successful! "$selectedModel" is ready.',
+        );
+      } else {
+        return (
+          success: false,
+          message: 'Received empty response from Gemini.',
+        );
+      }
+    } catch (e) {
+      final err = e.toString();
+      if (err.contains('404') ||
+          err.contains('not found') ||
+          err.contains('NotFound') ||
+          err.contains('is not found')) {
+        return (
+          success: false,
+          message: 'Model "$selectedModel" not found or not yet available (404).',
+        );
+      } else if (err.contains('400') ||
+          err.contains('API_KEY_INVALID') ||
+          err.contains('API key not valid') ||
+          err.contains('invalid api key')) {
+        return (
+          success: false,
+          message: 'Invalid Gemini API key (400).',
+        );
+      } else if (err.contains('429') ||
+          err.contains('RESOURCE_EXHAUSTED') ||
+          err.contains('quota')) {
+        return (
+          success: false,
+          message: 'Quota exceeded or rate limit reached (HTTP 429).',
+        );
+      } else if (err.contains('SocketException') ||
+          err.contains('Failed host lookup') ||
+          err.contains('Network is unreachable')) {
+        return (
+          success: false,
+          message: 'Network error. Please check your internet connection.',
+        );
+      }
+      return (
+        success: false,
+        message: 'Connection failed: $e',
+      );
+    }
   }
 }

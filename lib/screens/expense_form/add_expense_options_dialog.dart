@@ -61,7 +61,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
               children: [
             Text(
               'Add Expense',
-              style: AppTextStyles.headline2,
+              style: AppTextStyles.headline2Of(context),
               textAlign: TextAlign.center,
             ),
             const Gap(24),
@@ -73,7 +73,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
                 icon: Icons.auto_awesome_outlined,
                 label: 'AI-Scan Receipt',
                 subtitle: 'Auto-fill form using Gemini AI',
-                color: AppDesign.primary,
+                color: Theme.of(context).colorScheme.primary,
                 isEnabled: true,
                 onTap: () {
                   Navigator.pop(context);
@@ -88,7 +88,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
                       'OR MANUAL ENTRY',
-                      style: AppTextStyles.caption.copyWith(
+                      style: AppTextStyles.captionOf(context).copyWith(
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.1,
                       ),
@@ -145,7 +145,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
                         Expanded(
                           child: Text(
                             'Unlock AI-Powered Scanning',
-                            style: AppTextStyles.bodyLarge.copyWith(
+                            style: AppTextStyles.bodyLargeOf(context).copyWith(
                               fontWeight: FontWeight.w700,
                               letterSpacing: 0.2,
                             ),
@@ -158,10 +158,11 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
                       padding: const EdgeInsets.only(left: 48),
                       child: Text(
                         'Add a valid Gemini API key in your Profile settings to enable AI-Scan feature that automatically fills expense forms from receipt photos.',
-                        style: AppTextStyles.bodyMedium.copyWith(
+                        style: AppTextStyles.bodyMediumOf(context).copyWith(
                           fontWeight: FontWeight.w400,
                           height: 1.5,
                           letterSpacing: 0.1,
+                          color: AppDesign.textSecondaryOf(context),
                         ),
                       ),
                     ),
@@ -190,7 +191,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Text(
                       'SELECT SUB-CATEGORY',
-                      style: AppTextStyles.caption.copyWith(
+                      style: AppTextStyles.captionOf(context).copyWith(
                         fontWeight: FontWeight.bold,
                         letterSpacing: 1.1,
                       ),
@@ -254,20 +255,20 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
         decoration: BoxDecoration(
           border: Border.all(
             color: isEnabled
-                ? color.withValues(alpha: 0.2)
-                : Colors.grey.shade300,
+                ? color.withValues(alpha: 0.25)
+                : AppDesign.borderOf(context),
           ),
           borderRadius: BorderRadius.circular(16),
           color: isEnabled
-              ? color.withValues(alpha: 0.05)
-              : Colors.grey.shade50,
+              ? color.withValues(alpha: 0.08)
+              : AppDesign.surfaceElevatedOf(context),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isEnabled ? color : Colors.grey.shade400,
+                color: isEnabled ? color : AppDesign.textTertiaryOf(context),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: Colors.white, size: 24),
@@ -279,17 +280,17 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
                 children: [
                   Text(
                     label,
-                    style: AppTextStyles.bodyLarge.copyWith(
+                    style: AppTextStyles.bodyLargeOf(context).copyWith(
                       fontWeight: FontWeight.w600,
-                      color: isEnabled ? color : AppDesign.textSecondary,
+                      color: isEnabled ? color : AppDesign.textSecondaryOf(context),
                     ),
                   ),
                   Text(
                     subtitle,
-                    style: AppTextStyles.bodySmall.copyWith(
+                    style: AppTextStyles.bodySmallOf(context).copyWith(
                       color: isEnabled
-                          ? AppDesign.textSecondary
-                          : AppDesign.textTertiary,
+                          ? AppDesign.textSecondaryOf(context)
+                          : AppDesign.textTertiaryOf(context),
                     ),
                   ),
                 ],
@@ -297,7 +298,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
             ),
             Icon(
               isEnabled ? Icons.chevron_right_rounded : Icons.cloud_off_rounded,
-              color: isEnabled ? color : Colors.grey.shade400,
+              color: isEnabled ? color : AppDesign.textTertiaryOf(context),
             ),
           ],
         ),
@@ -307,7 +308,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
 
   Widget _buildHeadButton(BuildContext context, String head) {
     final isSelected = _selectedHead == head;
-    final primaryColor = AppDesign.primary;
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     return InkWell(
       onTap: () {
@@ -316,20 +317,20 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
           _selectedSubHead = null;
         });
       },
-                      borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+      borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? primaryColor.withValues(alpha: 0.1)
-              : Colors.white,
+              ? primaryColor.withValues(alpha: 0.15)
+              : AppDesign.surfaceElevatedOf(context),
           border: Border.all(
             color: isSelected
                 ? primaryColor
-                : Colors.grey.shade300,
+                : AppDesign.borderOf(context),
             width: isSelected ? 2 : 1,
           ),
-                      borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
+          borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
           boxShadow: isSelected
               ? [
                   BoxShadow(
@@ -347,20 +348,20 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
                 ? PremiumIcon(
                     svgPath: AppIcons.square3Stack3d,
                     size: 20,
-                    color: isSelected ? primaryColor : Colors.blueGrey,
+                    color: isSelected ? primaryColor : AppDesign.textSecondaryOf(context),
                   )
                 : Icon(
                     _getCategoryIcon(head),
                     size: 20,
-                    color: isSelected ? primaryColor : Colors.blueGrey,
+                    color: isSelected ? primaryColor : AppDesign.textSecondaryOf(context),
                   ),
             const Gap(10),
             Text(
               head,
-              style: AppTextStyles.bodyLarge.copyWith(
+              style: AppTextStyles.bodyLargeOf(context).copyWith(
                 fontSize: 15,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? primaryColor : AppDesign.textPrimary,
+                color: isSelected ? primaryColor : AppDesign.textPrimaryOf(context),
               ),
             ),
           ],
@@ -371,7 +372,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
 
   Widget _buildSubHeadButton(BuildContext context, String subHead) {
     final isSelected = _selectedSubHead == subHead;
-    final primaryColor = AppDesign.primary;
+    final primaryColor = Theme.of(context).colorScheme.primary;
     final icon = _selectedHead != null
         ? getExpenseIcon(_selectedHead!, subHead)
         : Icons.receipt_outlined;
@@ -389,9 +390,9 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? primaryColor : Colors.white,
+          color: isSelected ? primaryColor : AppDesign.surfaceElevatedOf(context),
           border: Border.all(
-            color: isSelected ? primaryColor : Colors.grey.shade300,
+            color: isSelected ? primaryColor : AppDesign.borderOf(context),
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
@@ -402,14 +403,14 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
             Icon(
               icon,
               size: 18,
-              color: isSelected ? Colors.white : Colors.blueGrey,
+              color: isSelected ? Colors.white : AppDesign.textSecondaryOf(context),
             ),
             const Gap(8),
             Text(
               subHead,
-              style: AppTextStyles.bodyMedium.copyWith(
+              style: AppTextStyles.bodyMediumOf(context).copyWith(
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? Colors.white : AppDesign.textPrimary,
+                color: isSelected ? Colors.white : AppDesign.textPrimaryOf(context),
               ),
             ),
           ],

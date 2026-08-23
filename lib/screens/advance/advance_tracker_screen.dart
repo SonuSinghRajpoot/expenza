@@ -9,11 +9,12 @@ class AdvanceTrackerScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppDesign.surface,
+      backgroundColor: AppDesign.surfaceOf(context),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             expandedHeight: 120.0,
+            backgroundColor: AppDesign.surfaceElevatedOf(context),
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(
                 left: AppDesign.screenHorizontalPadding,
@@ -21,9 +22,9 @@ class AdvanceTrackerScreen extends StatelessWidget {
               ),
               title: Text(
                 'Advance',
-                style: AppTextStyles.headline1,
+                style: AppTextStyles.headline1Of(context),
               ),
-              background: Container(color: AppDesign.surfaceElevated),
+              background: Container(color: AppDesign.surfaceElevatedOf(context)),
             ),
           ),
           SliverFillRemaining(
@@ -37,28 +38,30 @@ class AdvanceTrackerScreen extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(32),
                       decoration: BoxDecoration(
-                        color: AppDesign.primary.withValues(alpha: 0.1),
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
                         Icons.payments_outlined,
                         size: 64,
-                        color: AppDesign.primary,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     const Gap(32),
                     Text(
                       'Advance Tracking coming soon',
                       textAlign: TextAlign.center,
-                      style: AppTextStyles.headline2,
+                      style: AppTextStyles.headline2Of(context),
                     ),
                     const Gap(12),
                     Text(
                       'Track cash advances and settlements across all your business trips.',
                       textAlign: TextAlign.center,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppDesign.textSecondary,
-                        height: 1.5,
+                      style: AppTextStyles.bodyMediumOf(context).copyWith(
+                        color: AppDesign.textSecondaryOf(context),
                       ),
                     ),
                   ],

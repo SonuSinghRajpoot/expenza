@@ -1,7 +1,7 @@
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import com.android.build.api.variant.ApplicationAndroidComponentsExtension
-import com.android.build.api.variant.LibraryAndroidComponentsExtension
+import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.dsl.LibraryExtension
 import org.gradle.api.JavaVersion
 
 allprojects {
@@ -35,20 +35,11 @@ tasks.register<Delete>("clean") {
 }
 
 subprojects {
-    plugins.withId("com.android.application") {
-        extensions.configure<ApplicationAndroidComponentsExtension> {
-            finalizeDsl {
-                it.compileOptions.sourceCompatibility = JavaVersion.VERSION_17
-                it.compileOptions.targetCompatibility = JavaVersion.VERSION_17
-            }
-        }
-    }
-
     plugins.withId("com.android.library") {
-        extensions.configure<LibraryAndroidComponentsExtension> {
-            finalizeDsl {
-                it.compileOptions.sourceCompatibility = JavaVersion.VERSION_17
-                it.compileOptions.targetCompatibility = JavaVersion.VERSION_17
+        extensions.configure<LibraryExtension> {
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
             }
         }
     }
@@ -59,3 +50,4 @@ subprojects {
         }
     }
 }
+

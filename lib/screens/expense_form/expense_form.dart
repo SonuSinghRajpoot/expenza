@@ -13,10 +13,12 @@ import '../../core/constants/expense_constants.dart';
 import 'package:collection/collection.dart';
 import '../../services/gemini_service.dart';
 import '../../data/repositories/gemini_repository.dart';
+import '../../providers/gemini_provider.dart';
 import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/services/error_handler.dart';
 import '../../core/utils/permission_utils.dart';
+import 'widgets/image_viewer_dialog.dart';
 
 class ExpenseFormScreen extends ConsumerStatefulWidget {
   final int tripId;
@@ -194,6 +196,9 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
       );
       final tripCities = trip?.cities ?? [];
 
+      final modelAsync = ref.read(geminiModelProvider);
+      final selectedModel = modelAsync.value;
+
       final geminiService = GeminiService();
       // Send first 2 pages (e.g. PDF) so from/to can be read from itinerary
       final result = await geminiService.analyzeBill(
@@ -202,6 +207,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
         availableHeads: ExpenseConstants.heads,
         availableSubHeads: ExpenseConstants.subHeads,
         tripLocations: tripCities,
+        modelName: selectedModel,
       );
 
       if (mounted) {
@@ -307,7 +313,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
     final tripCities = trip?.cities ?? [];
 
     return Scaffold(
-      backgroundColor: AppDesign.surface,
+      backgroundColor: AppDesign.surfaceOf(context),
       appBar: AppBar(
         title: Text(widget.expense == null ? 'Add Expense' : 'Edit Expense'),
         actions: [
@@ -479,8 +485,8 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Colors.grey.shade200)),
+          color: AppDesign.surfaceElevatedOf(context),
+          border: Border(top: BorderSide(color: AppDesign.borderOf(context))),
         ),
         child: Row(
           children: [
@@ -490,7 +496,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                 child: OutlinedButton(
                   onPressed: () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppDesign.borderDefault),
+                    side: BorderSide(color: AppDesign.borderOf(context)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
                     ),
@@ -528,14 +534,14 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
       labelText: label,
       prefixText: prefix,
       filled: true,
-      fillColor: AppDesign.surfaceElevated,
+      fillColor: AppDesign.surfaceElevatedOf(context),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
-        borderSide: const BorderSide(color: AppDesign.borderDefault),
+        borderSide: BorderSide(color: AppDesign.borderOf(context)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
-        borderSide: const BorderSide(color: AppDesign.borderDefault),
+        borderSide: BorderSide(color: AppDesign.borderOf(context)),
       ),
     );
   }
@@ -567,23 +573,23 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
           enableSearch: true,
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
-            fillColor: Colors.white,
+            fillColor: AppDesign.surfaceElevatedOf(context),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 8,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade200),
+              borderSide: BorderSide(color: AppDesign.borderOf(context)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: AppDesign.borderOf(context)),
             ),
           ),
-          textStyle: AppTextStyles.bodyLarge,
+          textStyle: AppTextStyles.bodyLargeOf(context),
           menuStyle: MenuStyle(
-            backgroundColor: WidgetStateProperty.all(Colors.white),
+            backgroundColor: WidgetStateProperty.all(AppDesign.surfaceElevatedOf(context)),
             shape: WidgetStateProperty.all(
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -611,7 +617,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                   value: e,
                   label: e,
                   style: MenuItemButton.styleFrom(
-                    textStyle: AppTextStyles.bodyLarge,
+                    textStyle: AppTextStyles.bodyLargeOf(context),
                   ),
                 ),
               )
@@ -649,23 +655,23 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
           },
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
-            fillColor: Colors.white,
+            fillColor: AppDesign.surfaceElevatedOf(context),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 8,
             ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade200),
+              borderSide: BorderSide(color: AppDesign.borderOf(context)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
+              borderSide: BorderSide(color: AppDesign.borderOf(context)),
             ),
           ),
-          textStyle: AppTextStyles.bodyLarge,
+          textStyle: AppTextStyles.bodyLargeOf(context),
           menuStyle: MenuStyle(
-            backgroundColor: WidgetStateProperty.all(Colors.white),
+            backgroundColor: WidgetStateProperty.all(AppDesign.surfaceElevatedOf(context)),
             shape: WidgetStateProperty.all(
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
@@ -677,7 +683,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                   value: e,
                   label: e,
                   style: MenuItemButton.styleFrom(
-                    textStyle: AppTextStyles.bodyLarge,
+                    textStyle: AppTextStyles.bodyLargeOf(context),
                   ),
                 ),
               )
@@ -698,7 +704,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
         decoration: _inputDecoration(label),
         child: Text(
           DateFormat('dd MMM yyyy').format(date),
-          style: const TextStyle(fontSize: 16),
+          style: AppTextStyles.bodyLargeOf(context),
         ),
       ),
     );
@@ -709,10 +715,10 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          color: Colors.grey,
+          color: AppDesign.textSecondaryOf(context),
           letterSpacing: 1.2,
         ),
       ),
@@ -804,7 +810,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
 
     final DateTime? picked = await showModalBottomSheet<DateTime>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppDesign.surfaceElevatedOf(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -817,14 +823,14 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppDesign.borderDefault,
+                color: AppDesign.borderOf(context),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const Gap(16),
             Text(
               isStart ? 'Select Start Date' : 'Select End Date',
-              style: AppTextStyles.headline2.copyWith(
+              style: AppTextStyles.headline2Of(context).copyWith(
                 fontSize: 18,
               ),
             ),
@@ -1201,6 +1207,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 32),
               decoration: AppDesign.cardDecoration(
+                context: context,
                 borderRadius: AppDesign.buttonBorderRadius,
               ),
               child: Column(
@@ -1208,13 +1215,13 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                   Icon(
                     Icons.add_photo_alternate_outlined,
                     size: 40,
-                    color: AppDesign.primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   const Gap(8),
                   Text(
                     'Add Evidence (Images or PDF)',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppDesign.textTertiary,
+                    style: AppTextStyles.bodyMediumOf(context).copyWith(
+                      color: AppDesign.textTertiaryOf(context),
                     ),
                   ),
                 ],
@@ -1234,7 +1241,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
       margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
-        border: Border.all(color: AppDesign.borderDefault),
+        border: Border.all(color: AppDesign.borderOf(context)),
       ),
       child: Stack(
         children: [
@@ -1259,15 +1266,15 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                       ? Container(
                           width: 100,
                           height: 120,
-                          color: Colors.grey.shade200,
+                          color: AppDesign.surfaceElevatedOf(context),
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.broken_image, size: 32),
+                              Icon(Icons.broken_image, size: 32, color: AppDesign.textTertiaryOf(context)),
                               const Gap(4),
                               Text(
                                 'No longer available',
-                                style: AppTextStyles.bodySmall.copyWith(fontSize: 10),
+                                style: AppTextStyles.bodySmallOf(context).copyWith(fontSize: 10),
                               ),
                             ],
                           ),
@@ -1281,8 +1288,8 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                             return Container(
                               width: 100,
                               height: 120,
-                              color: Colors.grey.shade200,
-                              child: const Icon(Icons.broken_image, size: 32),
+                              color: AppDesign.surfaceElevatedOf(context),
+                              child: Icon(Icons.broken_image, size: 32, color: AppDesign.textTertiaryOf(context)),
                             );
                           },
                         ),
@@ -1325,8 +1332,9 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                         padding: EdgeInsets.all(
                             AppDesign.screenHorizontalPadding * 2),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppDesign.surfaceElevatedOf(context),
                           borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppDesign.borderOf(context)),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -1339,14 +1347,14 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                             const Gap(16),
                             Text(
                               'PDF Document',
-                              style: AppTextStyles.bodyLarge.copyWith(
+                              style: AppTextStyles.bodyLargeOf(context).copyWith(
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             const Gap(8),
                             Text(
                               path.split(RegExp(r'[/\\]')).last,
-                              style: AppTextStyles.bodySmall,
+                              style: AppTextStyles.bodySmallOf(context),
                               textAlign: TextAlign.center,
                             ),
                           ],
@@ -1355,17 +1363,18 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                     : Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppDesign.surfaceElevatedOf(context),
                           borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppDesign.borderOf(context)),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.broken_image, size: 64),
+                            Icon(Icons.broken_image, size: 64, color: AppDesign.textTertiaryOf(context)),
                             const Gap(12),
                             Text(
                               'Image no longer available',
-                              style: AppTextStyles.bodyMedium,
+                              style: AppTextStyles.bodyMediumOf(context),
                             ),
                           ],
                         ),
@@ -1397,7 +1406,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
     showDialog(
       context: context,
       barrierColor: Colors.black87,
-      builder: (ctx) => _ImageViewerDialog(
+      builder: (ctx) => ImageViewerDialog(
         imagePaths: imagePaths,
         initialIndex: startIndex,
         getImageProvider: _getImageProvider,
@@ -1407,17 +1416,18 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
   }
 
   Widget _buildAddMoreEvidence() {
+    final primaryColor = Theme.of(context).colorScheme.primary;
     return GestureDetector(
       onTap: () => _pickImage(context),
       child: Container(
         width: 100,
         height: 120,
         decoration: BoxDecoration(
-          color: Colors.blue.withValues(alpha: 0.05),
+          color: primaryColor.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+          border: Border.all(color: primaryColor.withValues(alpha: 0.25)),
         ),
-        child: const Icon(Icons.add_a_photo_outlined, color: Colors.blue),
+        child: Icon(Icons.add_a_photo_outlined, color: primaryColor),
       ),
     );
   }
@@ -1437,14 +1447,14 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppDesign.borderDefault,
+                color: AppDesign.borderOf(context),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const Gap(12),
             Text(
               'Add Evidence',
-              style: AppTextStyles.headline2.copyWith(
+              style: AppTextStyles.headline2Of(context).copyWith(
                 fontSize: 18,
               ),
             ),
@@ -1454,10 +1464,11 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
               label: 'Smart Scan (Camera or Gallery)',
               onTap: () async {
                 final cameraGranted = await PermissionUtils.requestCamera(context);
-                if (!cameraGranted) return;
+                if (!cameraGranted || !context.mounted) return;
                 final galleryGranted = await PermissionUtils.requestGallery(context);
-                if (!galleryGranted) return;
+                if (!galleryGranted || !ctx.mounted) return;
                 Navigator.pop(ctx);
+                if (!context.mounted) return;
                 final paths = await ImageUtils.scanDocument(context);
                 if (paths.isNotEmpty && mounted) {
                   setState(() => _billPaths.addAll(paths));
@@ -1469,7 +1480,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
               label: 'Upload PDF Document',
               onTap: () async {
                 final granted = await PermissionUtils.requestStorageForFiles(context);
-                if (!granted) return;
+                if (!granted || !ctx.mounted) return;
                 Navigator.pop(ctx);
                 final paths = await ImageUtils.pickPdfAndConvert();
                 if (paths.isNotEmpty && mounted) {
@@ -1489,18 +1500,19 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: AppDesign.primary.withValues(alpha: 0.1),
+          color: primaryColor.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(AppDesign.smallBorderRadius + 2),
         ),
-        child: Icon(icon, color: AppDesign.primary),
+        child: Icon(icon, color: primaryColor),
       ),
       title: Text(
         label,
-        style: AppTextStyles.bodyMedium,
+        style: AppTextStyles.bodyMediumOf(context),
       ),
       onTap: onTap,
     );
@@ -1526,189 +1538,22 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
             width: 80,
             child: Text(
               '$label:',
-              style: AppTextStyles.bodyMedium.copyWith(
+              style: AppTextStyles.bodyMediumOf(context).copyWith(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
-                color: AppDesign.textTertiary,
+                color: AppDesign.textTertiaryOf(context),
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: AppTextStyles.bodyMedium.copyWith(
+              style: AppTextStyles.bodyMediumOf(context).copyWith(
                 fontWeight: FontWeight.w500,
                 fontSize: 13,
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ImageViewerDialog extends StatefulWidget {
-  final List<String> imagePaths;
-  final int initialIndex;
-  final ImageProvider Function(String) getImageProvider;
-  final bool Function(String) isBillFileMissing;
-
-  const _ImageViewerDialog({
-    required this.imagePaths,
-    required this.initialIndex,
-    required this.getImageProvider,
-    required this.isBillFileMissing,
-  });
-
-  @override
-  State<_ImageViewerDialog> createState() => _ImageViewerDialogState();
-}
-
-class _ImageViewerDialogState extends State<_ImageViewerDialog> {
-  late PageController _pageController;
-  late int _currentIndex;
-  final Map<int, TransformationController> _transformationControllers = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
-  }
-
-  @override
-  void dispose() {
-    for (var controller in _transformationControllers.values) {
-      controller.dispose();
-    }
-    _transformationControllers.clear();
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  TransformationController _getControllerForIndex(int index) {
-    if (!_transformationControllers.containsKey(index)) {
-      _transformationControllers[index] = TransformationController();
-    }
-    return _transformationControllers[index]!;
-  }
-
-  bool _isZoomed(int index) {
-    final controller = _transformationControllers[index];
-    if (controller == null) return false;
-    return controller.value.getMaxScaleOnAxis() > 1.0;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final safePadding = MediaQuery.of(context).padding;
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Image viewer with PageView for swiping
-          PageView.builder(
-            controller: _pageController,
-            physics: const PageScrollPhysics(),
-            itemCount: widget.imagePaths.length,
-            onPageChanged: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              final path = widget.imagePaths[index];
-              
-              if (widget.isBillFileMissing(path)) {
-                return Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                        const Gap(12),
-                        Text(
-                          'Image no longer available',
-                          style: AppTextStyles.bodyMedium,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              return Center(
-                child: InteractiveViewer(
-                  transformationController: _getControllerForIndex(index),
-                  minScale: 0.5,
-                  maxScale: 4.0,
-                  boundaryMargin: const EdgeInsets.all(double.infinity),
-                  panEnabled: true,
-                  scaleEnabled: true,
-                  child: Image(
-                    image: widget.getImageProvider(path),
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(Icons.broken_image, size: 64, color: Colors.grey),
-                      );
-                    },
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // Close button - top right with safe area padding
-          Positioned(
-            top: safePadding.top + 8,
-            right: 16,
-            child: Material(
-              color: Colors.black.withValues(alpha: 0.5),
-              shape: const CircleBorder(),
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 24),
-                onPressed: () => Navigator.pop(context),
-                tooltip: 'Close',
-              ),
-            ),
-          ),
-
-          // Image counter - bottom center (only if multiple images)
-          if (widget.imagePaths.length > 1)
-            Positioned(
-              bottom: safePadding.bottom + 16,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${_currentIndex + 1} / ${widget.imagePaths.length}',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );

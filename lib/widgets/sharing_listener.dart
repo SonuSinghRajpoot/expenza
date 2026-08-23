@@ -11,6 +11,7 @@ import '../providers/trip_provider.dart';
 import '../screens/expense_form/expense_form.dart';
 import '../screens/expense_form/add_expense_options_dialog.dart';
 import '../core/constants/expense_constants.dart';
+import '../core/services/biometric_service.dart';
 import '../core/theme/app_design.dart';
 import '../core/utils/image_utils.dart';
 import '../core/utils/permission_utils.dart';
@@ -27,6 +28,7 @@ class SharingListener extends ConsumerStatefulWidget {
 class _SharingListenerState extends ConsumerState<SharingListener> {
   StreamSubscription? _intentDataStreamSubscription;
   bool _launchPermissionsRequested = false;
+  List<SharedMediaFile>? _pendingSharedFiles;
 
   @override
   void initState() {
@@ -70,6 +72,15 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
     // Filter for valid files (Image/PDF)
     final validFiles = files.where((f) => f.path.isNotEmpty).toList();
     if (validFiles.isEmpty) return;
+
+    // If app lock is enabled and session is currently locked, queue files for post-unlock
+    final isLockEnabled = ref.read(appLockEnabledProvider);
+    final isUnlocked = ref.read(isAppUnlockedProvider);
+    if (isLockEnabled && !isUnlocked) {
+      debugPrint('SharingListener: App is locked. Holding ${validFiles.length} shared files until unlock.');
+      _pendingSharedFiles = validFiles;
+      return;
+    }
 
     // 1. Check for Active Trips
     // We use ref.read(tripListProvider.future) to ensure we get the latest data
@@ -217,6 +228,22 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
   @override
   Widget build(BuildContext context) {
     _requestLaunchPermissions();
+
+    // Listen for biometric unlock: if there are pending shared files, process them immediately
+    ref.listen<bool>(isAppUnlockedProvider, (previous, isUnlocked) {
+      if (isUnlocked &&
+          _pendingSharedFiles != null &&
+          _pendingSharedFiles!.isNotEmpty) {
+        final filesToProcess = List<SharedMediaFile>.from(_pendingSharedFiles!);
+        _pendingSharedFiles = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _handleSharedFiles(filesToProcess);
+          }
+        });
+      }
+    });
+
     return widget.child;
   }
 }

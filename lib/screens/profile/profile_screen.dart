@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
@@ -5,9 +6,12 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/user_profile.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/theme_provider.dart';
 import 'edit_profile_dialog.dart';
-import 'dart:convert';
+import 'package:intl/intl.dart';
 import '../../providers/gemini_provider.dart';
+import '../../data/repositories/gemini_repository.dart';
+import '../../core/services/account_backup_service.dart';
 import 'manage_gemini_keys_dialog.dart';
 import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -15,6 +19,7 @@ import '../../core/theme/app_icons.dart';
 import '../../core/theme/premium_icon.dart';
 import '../../core/services/error_handler.dart';
 import '../../core/constants/build_info.dart';
+import '../../core/services/biometric_service.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -29,11 +34,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final profileAsync = ref.watch(userProfileProvider);
 
     return Scaffold(
-      backgroundColor: AppDesign.surface,
+      backgroundColor: AppDesign.surfaceOf(context),
       body: profileAsync.when(
         data: (profile) => _buildProfileBody(context, profile),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text(ErrorHandler.getUserFriendlyMessage(err))),
+        error: (err, stack) =>
+            Center(child: Text(ErrorHandler.getUserFriendlyMessage(err))),
       ),
     );
   }
@@ -45,6 +51,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           expandedHeight: 120.0,
           floating: true,
           pinned: true,
+          backgroundColor: AppDesign.surfaceElevatedOf(context),
           flexibleSpace: FlexibleSpaceBar(
             titlePadding: const EdgeInsets.only(
               left: AppDesign.screenHorizontalPadding,
@@ -52,9 +59,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             title: Text(
               'Accounts',
-              style: AppTextStyles.headline1,
+              style: AppTextStyles.headline1Of(context),
             ),
-            background: Container(color: AppDesign.surfaceElevated),
+            background: Container(color: AppDesign.surfaceElevatedOf(context)),
           ),
         ),
         SliverToBoxAdapter(
@@ -67,7 +74,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               children: [
                 _buildProfileHeader(context, profile),
                 const Gap(32),
+                _buildAppearanceSection(context),
+                const Gap(24),
+                _buildSecuritySection(context),
+                const Gap(24),
                 _buildSettingsGroup(
+                  context,
                   'OFFICIAL PROFILE',
                   [
                     _InfoItem(
@@ -99,6 +111,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const Gap(24),
                 _buildSettingsGroup(
+                  context,
                   'CONTACT INFORMATION',
                   [
                     _InfoItem(
@@ -120,6 +133,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const Gap(24),
                 _buildSettingsGroup(
+                  context,
                   'BANK DETAILS',
                   [
                     _InfoItem(
@@ -166,6 +180,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
                 const Gap(24),
                 _buildSettingsGroup(
+                  context,
                   'UPI DETAILS',
                   [
                     _InfoItem(
@@ -192,13 +207,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const Gap(24),
                 _buildGeminiSection(context),
                 const Gap(24),
-                _buildDataStorageNotice(),
+                _buildAccountBackupSection(context),
+                const Gap(24),
+                _buildDataStorageNotice(context),
                 const Gap(40),
                 TextButton(
                   onPressed: () {},
                   child: Text(
                     'LOG OUT',
-                    style: AppTextStyles.caption.copyWith(
+                    style: AppTextStyles.captionOf(context).copyWith(
                       color: AppDesign.error,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 1.2,
@@ -206,9 +223,200 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
                 const Gap(20),
-                _AppVersionInfo(),
+                const _AppVersionInfo(),
               ],
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAppearanceSection(BuildContext context) {
+    final currentThemeMode = ref.watch(themeModeProvider);
+    final isDark = context.isDarkMode;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'APPEARANCE & THEME',
+            style: AppTextStyles.captionOf(context).copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+        Container(
+          decoration: AppDesign.cardDecoration(
+            context: context,
+            borderRadius: AppDesign.itemBorderRadius,
+          ),
+          padding: const EdgeInsets.all(AppDesign.cardInternalPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.12),
+                      borderRadius:
+                          BorderRadius.circular(AppDesign.smallBorderRadius),
+                    ),
+                    child: Icon(
+                      currentThemeMode == ThemeMode.dark
+                          ? Icons.dark_mode_rounded
+                          : currentThemeMode == ThemeMode.light
+                              ? Icons.light_mode_rounded
+                              : Icons.brightness_auto_rounded,
+                      size: 20,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const Gap(12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Theme Mode',
+                          style: AppTextStyles.bodyMediumOf(context).copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          currentThemeMode == ThemeMode.system
+                              ? 'Auto (System: ${isDark ? 'Dark' : 'Light'})'
+                              : currentThemeMode == ThemeMode.dark
+                                  ? 'Always Dark'
+                                  : 'Always Light',
+                          style: AppTextStyles.captionOf(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Gap(16),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<ThemeMode>(
+                  showSelectedIcon: false,
+                  segments: const [
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.system,
+                      icon: Icon(Icons.brightness_auto_rounded, size: 16),
+                      label: Text('System'),
+                    ),
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.light,
+                      icon: Icon(Icons.light_mode_rounded, size: 16),
+                      label: Text('Light'),
+                    ),
+                    ButtonSegment<ThemeMode>(
+                      value: ThemeMode.dark,
+                      icon: Icon(Icons.dark_mode_rounded, size: 16),
+                      label: Text('Dark'),
+                    ),
+                  ],
+                  selected: {currentThemeMode},
+                  onSelectionChanged: (Set<ThemeMode> newSelection) {
+                    ref
+                        .read(themeModeProvider.notifier)
+                        .setThemeMode(newSelection.first);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSecuritySection(BuildContext context) {
+    final isAppLockEnabled = ref.watch(appLockEnabledProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'SECURITY & PRIVACY',
+            style: AppTextStyles.captionOf(context).copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+        Container(
+          decoration: AppDesign.cardDecoration(
+            context: context,
+            borderRadius: AppDesign.itemBorderRadius,
+          ),
+          padding: const EdgeInsets.all(AppDesign.cardInternalPadding),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.12),
+                  borderRadius:
+                      BorderRadius.circular(AppDesign.smallBorderRadius),
+                ),
+                child: const PremiumIcon(
+                  svgPath: AppIcons.lock,
+                  size: 20,
+                ),
+              ),
+              const Gap(12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'App Lock (Biometrics / PIN)',
+                      style: AppTextStyles.bodyMediumOf(context).copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Require authentication when opening app',
+                      style: AppTextStyles.captionOf(context),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: isAppLockEnabled,
+                activeThumbColor: Theme.of(context).colorScheme.primary,
+                onChanged: (val) async {
+                  final success =
+                      await ref.read(appLockEnabledProvider.notifier).toggle(val);
+                  if (!success && val && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Authentication cancelled or not available on device.',
+                        ),
+                        backgroundColor: AppDesign.error,
+                      ),
+                    );
+                  }
+                },
+              ),
+            ],
           ),
         ),
       ],
@@ -228,11 +436,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: !hasImage
-                    ? LinearGradient(
+                    ? const LinearGradient(
                         colors: [AppDesign.primary, AppDesign.secondary],
                       )
                     : null,
-                border: Border.all(color: Colors.white, width: 4),
+                border: Border.all(
+                  color: AppDesign.surfaceElevatedOf(context),
+                  width: 4,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0x332563EB),
@@ -263,7 +474,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               child: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AppDesign.primary,
                   shape: BoxShape.circle,
                 ),
@@ -281,13 +492,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           profile?.nickName.isNotEmpty == true
               ? profile!.nickName
               : profile?.fullName ?? 'New User',
-          style: AppTextStyles.headline1,
+          style: AppTextStyles.headline1Of(context),
         ),
         if (profile?.nickName.isNotEmpty == true)
           Text(
             profile?.fullName ?? '',
-            style: AppTextStyles.bodyLarge.copyWith(
-              color: AppDesign.textSecondary,
+            style: AppTextStyles.bodyLargeOf(context).copyWith(
+              color: AppDesign.textSecondaryOf(context),
             ),
           ),
         const Gap(4),
@@ -295,8 +506,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           profile?.employeeId.isNotEmpty == true
               ? 'ID: ${profile!.employeeId}'
               : 'ID: Pending',
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppDesign.textTertiary,
+          style: AppTextStyles.bodyMediumOf(context).copyWith(
+            color: AppDesign.textTertiaryOf(context),
           ),
         ),
       ],
@@ -304,6 +515,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildSettingsGroup(
+    BuildContext context,
     String title,
     List<Widget> items, {
     VoidCallback? onEdit,
@@ -318,7 +530,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             children: [
               Text(
                 title,
-                style: AppTextStyles.caption.copyWith(
+                style: AppTextStyles.captionOf(context).copyWith(
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.2,
                 ),
@@ -329,13 +541,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: onEdit,
-                  color: AppDesign.primary,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
             ],
           ),
         ),
         Container(
           decoration: AppDesign.cardDecoration(
+            context: context,
             borderRadius: AppDesign.itemBorderRadius,
           ),
           child: Padding(
@@ -352,39 +565,150 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildGeminiSection(BuildContext context) {
     final activeKeyAsync = ref.watch(activeGeminiKeyProvider);
+    final activeModelAsync = ref.watch(geminiModelProvider);
+    final currentModel =
+        activeModelAsync.value ?? GeminiRepository.defaultModel;
 
-    return _buildSettingsGroup('GEMINI CONFIGURATION', [
-      activeKeyAsync.when(
-        data: (key) => _InfoItem(
-          svgPath: AppIcons.gemini,
-          label: key != null ? 'Active Key: ${key.label}' : 'No active key',
-          value: key?.maskedKey ?? 'Configure your Gemini key',
+    return _buildSettingsGroup(
+      context,
+      'GEMINI CONFIGURATION',
+      [
+        activeKeyAsync.when(
+          data: (key) => _InfoItem(
+            svgPath: AppIcons.gemini,
+            label: key != null ? 'Active Key: ${key.label}' : 'No active key',
+            value: key?.maskedKey ?? 'Configure your Gemini key',
+          ),
+          loading: () => const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Center(child: LinearProgressIndicator()),
+          ),
+          error: (err, _) => const _InfoItem(
+            svgPath: AppIcons.error,
+            label: 'Gemini Key',
+            value: 'Error loading key',
+          ),
         ),
-        loading: () => const Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Center(child: LinearProgressIndicator()),
+        _InfoItem(
+          svgPath: AppIcons.commandLine,
+          label: 'Model Version',
+          value: currentModel,
         ),
-        error: (err, _) => const _InfoItem(
-          svgPath: AppIcons.error,
-          label: 'Gemini Key',
-          value: 'Error loading key',
-        ),
-      ),
-    ], onEdit: () => _showManageGeminiKeysDialog(context));
+      ],
+      onEdit: () => _showManageGeminiKeysDialog(context),
+    );
   }
 
-  Widget _buildDataStorageNotice() {
+  Widget _buildAccountBackupSection(BuildContext context) {
+    return FutureBuilder<DateTime?>(
+      future: AccountBackupService().getLastBackupTime(),
+      builder: (context, snapshot) {
+        final lastBackup = snapshot.data;
+        final timeStr = lastBackup != null
+            ? DateFormat('MMM dd, yyyy • hh:mm a').format(lastBackup)
+            : 'Auto-sync active';
+
+        return Column(
+          children: [
+            _buildSettingsGroup(context, 'LOCAL BACKUP & PERSISTENCE', [
+              _InfoItem(
+                svgPath: AppIcons.check,
+                label: 'Persistent Storage',
+                value: 'Documents/Expenza/expenza_account_config.json',
+              ),
+              _InfoItem(
+                svgPath: AppIcons.calendar,
+                label: 'Last Synced',
+                value: timeStr,
+              ),
+            ]),
+            const Gap(10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await AccountBackupService().syncAccountBackup();
+                      setState(() {});
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'Account profile & Gemini keys backed up to device storage!',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.backup_outlined, size: 16),
+                    label: const Text('Backup Now'),
+                  ),
+                ),
+                const Gap(8),
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: () async {
+                      final result =
+                          await AccountBackupService().manualRestore();
+                      if (result.restored) {
+                        ref.invalidate(userProfileProvider);
+                        ref.invalidate(geminiKeysProvider);
+                        ref.invalidate(geminiModelProvider);
+                        setState(() {});
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Account configuration restored successfully!',
+                              ),
+                            ),
+                          );
+                        }
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'No local backup file found to restore.',
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.restore_outlined, size: 16),
+                    label: const Text('Restore Backup'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDataStorageNotice(BuildContext context) {
+    final isDark = context.isDarkMode;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.1),
+        color: isDark
+            ? Colors.amber.shade900.withValues(alpha: 0.18)
+            : Colors.amber.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppDesign.itemBorderRadius),
-        border: Border.all(color: Colors.amber.shade200),
+        border: Border.all(
+          color: isDark ? Colors.amber.shade700 : Colors.amber.shade200,
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, color: Colors.amber.shade700, size: 22),
+          Icon(
+            Icons.info_outline,
+            color: isDark ? Colors.amber.shade300 : Colors.amber.shade800,
+            size: 22,
+          ),
           const Gap(12),
           Expanded(
             child: Column(
@@ -392,15 +716,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               children: [
                 Text(
                   'Data storage',
-                  style: AppTextStyles.bodyMedium.copyWith(
+                  style: AppTextStyles.bodyMediumOf(context).copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const Gap(4),
                 Text(
                   'Your trips and expenses are stored locally. Clearing app data or storage in device settings will permanently delete all your data. Export your trips regularly to keep a backup.',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppDesign.textSecondary,
+                  style: AppTextStyles.bodySmallOf(context).copyWith(
+                    color: AppDesign.textSecondaryOf(context),
                     height: 1.4,
                   ),
                 ),
@@ -464,18 +788,18 @@ class _AppVersionInfo extends StatelessWidget {
             children: [
               Text(
                 'App Version $versionText',
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppDesign.textTertiary,
+                style: AppTextStyles.bodySmallOf(context).copyWith(
+                  color: AppDesign.textTertiaryOf(context),
                   decoration: TextDecoration.underline,
-                  decorationColor: AppDesign.textTertiary,
+                  decorationColor: AppDesign.textTertiaryOf(context),
                 ),
               ),
               if (hasTimestamp) ...[
                 const Gap(4),
                 Text(
                   'Rolled out: $buildTimestamp',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppDesign.textTertiary,
+                  style: AppTextStyles.bodySmallOf(context).copyWith(
+                    color: AppDesign.textTertiaryOf(context),
                     fontSize: 11,
                   ),
                 ),
@@ -508,13 +832,13 @@ class _InfoItem extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppDesign.surface,
+              color: AppDesign.surfaceOf(context),
               borderRadius: BorderRadius.circular(10),
             ),
             child: PremiumIcon(
               svgPath: svgPath,
               size: 20,
-              color: AppDesign.textSecondary,
+              color: AppDesign.textSecondaryOf(context),
             ),
           ),
           const Gap(16),
@@ -524,11 +848,11 @@ class _InfoItem extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: AppTextStyles.bodySmall,
+                  style: AppTextStyles.bodySmallOf(context),
                 ),
                 Text(
                   value,
-                  style: AppTextStyles.bodyLarge.copyWith(
+                  style: AppTextStyles.bodyLargeOf(context).copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),

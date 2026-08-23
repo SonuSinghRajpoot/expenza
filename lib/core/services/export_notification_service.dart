@@ -29,7 +29,7 @@ class ExportNotificationService {
     const initSettings = InitializationSettings(android: androidSettings);
 
     await _plugin.initialize(
-      initSettings,
+      settings: initSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
@@ -78,10 +78,10 @@ class ExportNotificationService {
     const details = NotificationDetails(android: androidDetails);
 
     await _plugin.show(
-      0,
-      '$fileType Export Ready',
-      'Tap to open $fileName',
-      details,
+      id: 0,
+      title: '$fileType Export Ready',
+      body: 'Tap to open $fileName',
+      notificationDetails: details,
       payload: filePath,
     );
   }

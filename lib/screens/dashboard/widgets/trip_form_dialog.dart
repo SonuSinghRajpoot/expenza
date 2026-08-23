@@ -174,7 +174,7 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
           borderRadius: BorderRadius.circular(AppDesign.cardBorderRadius)),
       title: Text(
         widget.trip == null ? 'New Trip' : 'Edit Trip',
-        style: AppTextStyles.headline2,
+        style: AppTextStyles.headline2Of(context),
       ),
       content: ConstrainedBox(
         constraints: BoxConstraints(
@@ -186,22 +186,28 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildFieldHeading('Trip Name'),
+              _buildFieldHeading(context, 'Trip Name'),
               const Gap(8),
               TextField(
                 controller: _nameController,
-                decoration: AppDesign.inputDecoration('e.g. Client Meeting'),
-                style: AppTextStyles.bodyLarge,
+                decoration: AppDesign.inputDecoration(
+                  'e.g. Client Meeting',
+                  context: context,
+                ),
+                style: AppTextStyles.bodyLargeOf(context),
                 textCapitalization: TextCapitalization.sentences,
               ),
               const Gap(20),
-              _buildFieldHeading('Start Date'),
+              _buildFieldHeading(context, 'Start Date'),
               const Gap(8),
               InkWell(
                 onTap: _pickDate,
                 borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
                 child: InputDecorator(
-                  decoration: AppDesign.inputDecoration('Pick travel date'),
+                  decoration: AppDesign.inputDecoration(
+                    'Pick travel date',
+                    context: context,
+                  ),
                   child: Row(
                     children: [
                       const Icon(
@@ -212,20 +218,23 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                       const Gap(12),
                       Text(
                         DateFormat('dd MMM yyyy').format(_startDate),
-                        style: AppTextStyles.bodyLarge,
+                        style: AppTextStyles.bodyLargeOf(context),
                       ),
                     ],
                   ),
                 ),
               ),
               const Gap(20),
-              _buildFieldHeading('End Date'),
+              _buildFieldHeading(context, 'End Date'),
               const Gap(8),
               InkWell(
                 onTap: _pickEndDate,
                 borderRadius: BorderRadius.circular(AppDesign.buttonBorderRadius),
                 child: InputDecorator(
-                  decoration: AppDesign.inputDecoration('Pick end date (optional)'),
+                  decoration: AppDesign.inputDecoration(
+                    'Pick end date (optional)',
+                    context: context,
+                  ),
                   child: Row(
                     children: [
                       const Icon(
@@ -238,8 +247,10 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                         _endDate != null
                             ? DateFormat('dd MMM yyyy').format(_endDate!)
                             : 'Not set',
-                        style: AppTextStyles.bodyLarge.copyWith(
-                          color: _endDate != null ? null : AppDesign.textTertiary,
+                        style: AppTextStyles.bodyLargeOf(context).copyWith(
+                          color: _endDate != null
+                              ? null
+                              : AppDesign.textTertiaryOf(context),
                         ),
                       ),
                     ],
@@ -247,7 +258,7 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                 ),
               ),
               const Gap(16),
-              _buildFieldHeading('Locations (Multiple Allowed)'),
+              _buildFieldHeading(context, 'Locations (Multiple Allowed)'),
               const Gap(6),
               Visibility(
                 visible: _selectedCities.isNotEmpty,
@@ -262,20 +273,21 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                             key: ValueKey('chip_$c'),
                             label: Text(
                               c,
-                              style: AppTextStyles.bodyMedium.copyWith(
+                              style: AppTextStyles.bodyMediumOf(context).copyWith(
                                 fontSize: 12,
                               ),
                             ),
                             onDeleted: () => _removeCity(c),
                             deleteIcon: const Icon(Icons.close, size: 14),
-                            deleteIconColor: AppDesign.textSecondary,
+                            deleteIconColor: AppDesign.textSecondaryOf(context),
                             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             visualDensity: VisualDensity.compact,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 6,
                               vertical: 2,
                             ),
-                            backgroundColor: AppDesign.primary.withValues(alpha: 0.1),
+                            backgroundColor:
+                                AppDesign.primary.withValues(alpha: 0.12),
                             side: BorderSide.none,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(6),
@@ -291,18 +303,20 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                 onChanged: (val) => setState(() => _searchQuery = val),
                 onSubmitted: (val) => _addCity(val),
                 textInputAction: TextInputAction.next,
-                style: AppTextStyles.bodyLarge,
-                decoration: AppDesign.inputDecoration('Type and press enter or +')
-                    .copyWith(
-                      suffixIcon: IconButton(
-                        onPressed: () => _addCity(_citySearchController.text),
-                        icon: const Icon(
-                          Icons.add_circle_rounded,
-                          color: AppDesign.primary,
-                        ),
-                        tooltip: 'Add City',
-                      ),
+                style: AppTextStyles.bodyLargeOf(context),
+                decoration: AppDesign.inputDecoration(
+                  'Type and press enter or +',
+                  context: context,
+                ).copyWith(
+                  suffixIcon: IconButton(
+                    onPressed: () => _addCity(_citySearchController.text),
+                    icon: const Icon(
+                      Icons.add_circle_rounded,
+                      color: AppDesign.primary,
                     ),
+                    tooltip: 'Add City',
+                  ),
+                ),
                 textCapitalization: TextCapitalization.words,
               ),
               const Gap(6),
@@ -318,6 +332,7 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                       vertical: 6,
                     ),
                     decoration: AppDesign.cardDecoration(
+                      context: context,
                       borderRadius: AppDesign.buttonBorderRadius,
                     ),
                     child: Column(
@@ -326,7 +341,7 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                       children: [
                         Text(
                           'Select from previous trips',
-                          style: AppTextStyles.bodySmall.copyWith(
+                          style: AppTextStyles.bodySmallOf(context).copyWith(
                             fontWeight: FontWeight.w600,
                             fontSize: 11,
                             letterSpacing: 0.2,
@@ -341,13 +356,13 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
                               key: ValueKey('suggestion_$city'),
                               label: Text(
                                 city,
-                                style: AppTextStyles.bodySmall.copyWith(
+                                style: AppTextStyles.bodySmallOf(context).copyWith(
                                   fontSize: 11,
                                 ),
                               ),
                               onPressed: () => _addCity(city),
-                              backgroundColor: AppDesign.surfaceElevated,
-                              side: const BorderSide(color: AppDesign.borderDefault),
+                              backgroundColor: AppDesign.surfaceElevatedOf(context),
+                              side: BorderSide(color: AppDesign.borderOf(context)),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(6),
                               ),
@@ -413,10 +428,10 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
     );
   }
 
-  Widget _buildFieldHeading(String title) {
+  Widget _buildFieldHeading(BuildContext context, String title) {
     return Text(
       title,
-      style: AppTextStyles.caption.copyWith(
+      style: AppTextStyles.captionOf(context).copyWith(
         fontWeight: FontWeight.w700,
         letterSpacing: 1.1,
       ),

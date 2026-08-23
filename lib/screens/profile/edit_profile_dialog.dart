@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../models/user_profile.dart';
 import '../../providers/user_provider.dart';
@@ -273,7 +272,7 @@ class _EditProfileDialogState extends ConsumerState<EditProfileDialog> {
             controller: _whatsappController,
             decoration: _inputDecoration(
               'WhatsApp Number',
-              FontAwesomeIcons.whatsapp,
+              Icons.chat_bubble_outline,
             ),
             enabled: !_isWhatsappSame,
           ),

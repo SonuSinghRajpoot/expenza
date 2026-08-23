@@ -61,3 +61,27 @@ final activeGeminiKeyProvider = Provider<AsyncValue<GeminiKey?>>((ref) {
     }
   });
 });
+
+final geminiModelProvider =
+    AsyncNotifierProvider<GeminiModelNotifier, String>(() {
+      return GeminiModelNotifier();
+    });
+
+class GeminiModelNotifier extends AsyncNotifier<String> {
+  late final GeminiRepository _repository;
+
+  @override
+  Future<String> build() async {
+    _repository = ref.watch(geminiRepositoryProvider);
+    return _repository.getSelectedModel();
+  }
+
+  Future<void> setModel(String model) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await _repository.setSelectedModel(model);
+      return _repository.getSelectedModel();
+    });
+  }
+}
+

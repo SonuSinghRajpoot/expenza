@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Expenza Dynamic Rupee Icon Preview</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 40px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0B0F19;
+      color: #F8FAFC;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+    h1 {
+      margin-bottom: 8px;
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #A5B4FC, #38BDF8);
+      background-clip: text;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    p.subtitle {
+      margin-top: 0;
+      margin-bottom: 40px;
+      color: #94A3B8;
+      font-size: 15px;
+    }
+    .preview-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      max-width: 900px;
+      width: 100%;
+    }
+    .card {
+      border-radius: 28px;
+      padding: 40px 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      transition: transform 0.2s ease;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+    }
+    .card.dark-theme {
+      background: #0F172A;
+      border: 1px solid #1E293B;
+      color: #F8FAFC;
+    }
+    .card.light-theme {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      color: #0F172A;
+    }
+    .icon-wrapper {
+      margin-bottom: 24px;
+      width: 160px;
+      height: 160px;
+      border-radius: 36px;
+      overflow: hidden;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    }
+    .label {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .tag {
+      font-size: 13px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .dark-theme .tag {
+      background: rgba(99, 102, 241, 0.2);
+      color: #818CF8;
+    }
+    .light-theme .tag {
+      background: rgba(79, 70, 229, 0.1);
+      color: #4F46E5;
+    }
+  </style>
+</head>
+<body>
+  <h1>Expenza App Icon Preview (Updated -20% Sizing)</h1>
+  <p class="subtitle">Full-Bleed Background with Balanced Safe-Area Sizing</p>
+
+  <div class="preview-container">
+    <!-- DARK MODE PREVIEW -->
+    <div class="card dark-theme">
+      <div class="icon-wrapper">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="160" height="160" fill="none">
+          <rect width="108" height="108" fill="url(#darkBgGrad)" />
+          <circle cx="54" cy="54" r="37" fill="url(#darkInnerBgGrad)" stroke="url(#darkBorderGrad)" stroke-width="2.2" />
+          <circle cx="54" cy="54" r="31" stroke="#6366F1" stroke-width="1.0" stroke-opacity="0.35" />
+          <g transform="translate(25.2, 25.2) scale(2.4)" stroke="url(#darkStrokeGrad)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 8.25H9m6 3H9m3 6-3-3h1.5a3 3 0 1 0 0-6M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </g>
+          <defs>
+            <linearGradient id="darkBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#1E1B4B" />
+              <stop offset="100%" stop-color="#090D16" />
+            </linearGradient>
+            <radialGradient id="darkInnerBgGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#1E293B" />
+              <stop offset="70%" stop-color="#0F172A" />
+              <stop offset="100%" stop-color="#050811" />
+            </radialGradient>
+            <linearGradient id="darkBorderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#818CF8" stop-opacity="0.9" />
+              <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.45" />
+            </linearGradient>
+            <linearGradient id="darkStrokeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#E0E7FF" />
+              <stop offset="45%" stop-color="#818CF8" />
+              <stop offset="100%" stop-color="#38BDF8" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="label">Dark Screen Mode</div>
+      <div class="tag">Obsidian & Electric Cyan-Indigo</div>
+    </div>
+
+    <!-- LIGHT MODE PREVIEW -->
+    <div class="card light-theme">
+      <div class="icon-wrapper">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="160" height="160" fill="none">
+          <rect width="108" height="108" fill="url(#lightBgGrad)" />
+          <circle cx="54" cy="54" r="37" fill="url(#lightInnerBgGrad)" stroke="url(#lightBorderGrad)" stroke-width="2.2" />
+          <circle cx="54" cy="54" r="31" stroke="#C7D2FE" stroke-width="1.0" stroke-opacity="0.5" />
+          <g transform="translate(25.2, 25.2) scale(2.4)" stroke="url(#lightStrokeGrad)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 8.25H9m6 3H9m3 6-3-3h1.5a3 3 0 1 0 0-6M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </g>
+          <defs>
+            <linearGradient id="lightBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#F8FAFC" />
+              <stop offset="100%" stop-color="#E2E8F0" />
+            </linearGradient>
+            <radialGradient id="lightInnerBgGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#FFFFFF" />
+              <stop offset="70%" stop-color="#F1F5F9" />
+              <stop offset="100%" stop-color="#EEF2FF" />
+            </radialGradient>
+            <linearGradient id="lightBorderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#CBD5E1" />
+              <stop offset="100%" stop-color="#A5B4FC" />
+            </linearGradient>
+            <linearGradient id="lightStrokeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#4F46E5" />
+              <stop offset="100%" stop-color="#3730A3" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="label">Light Screen Mode</div>
+      <div class="tag">Pearl White & Royal Indigo</div>
+    </div>
+  </div>
+</body>
+</html>

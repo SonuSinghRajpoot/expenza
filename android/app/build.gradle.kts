@@ -3,7 +3,6 @@ import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
-    id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -17,7 +16,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.fieldexpensemanager.field_expense_manager"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -26,9 +25,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     defaultConfig {
         applicationId = "com.fieldexpensemanager.field_expense_manager"
@@ -41,20 +37,24 @@ android {
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
+                val storeFilePath = keystoreProperties["storeFile"] as? String
+                if (storeFilePath != null && file(storeFilePath).exists()) {
+                    keyAlias = keystoreProperties["keyAlias"] as String
+                    keyPassword = keystoreProperties["keyPassword"] as String
+                    storeFile = file(storeFilePath)
+                    storePassword = keystoreProperties["storePassword"] as String
+                }
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
+            val releaseConfig = signingConfigs.findByName("release")
+            signingConfig = if (releaseConfig?.storeFile?.exists() == true) {
+                releaseConfig
             } else {
-                signingConfigs.getByName("debug") // Fallback for CI/CD
+                signingConfigs.getByName("debug") // Fallback for local build / CI
             }
             isMinifyEnabled = false // Set to true after adding ProGuard rules
             isShrinkResources = false // Set to true when minifyEnabled is true

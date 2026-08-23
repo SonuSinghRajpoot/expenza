@@ -29,6 +29,7 @@ class PermissionUtils {
   static Future<bool> requestCamera(BuildContext context) async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return true;
     final status = await Permission.camera.request();
+    if (!context.mounted) return status.isGranted;
     return _handleResult(context, status, 'Camera access is needed to scan documents.');
   }
 
@@ -37,6 +38,7 @@ class PermissionUtils {
   static Future<bool> requestGallery(BuildContext context) async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return true;
     final status = await Permission.photos.request();
+    if (!context.mounted) return status.isGranted;
     return _handleResult(context, status, 'Gallery access is needed to select images.');
   }
 
@@ -52,6 +54,7 @@ class PermissionUtils {
     if (!status.isGranted) {
       status = await Permission.storage.request();
     }
+    if (!context.mounted) return status.isGranted;
     return _handleResult(context, status, 'Storage access is needed to select files.');
   }
 

@@ -8,13 +8,13 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppDesign.surface,
+      backgroundColor: AppDesign.surfaceOf(context),
       appBar: AppBar(
         title: Text(
           'Dashboard',
-          style: AppTextStyles.headline1.copyWith(fontSize: 20),
+          style: AppTextStyles.headline1Of(context).copyWith(fontSize: 20),
         ),
-        backgroundColor: AppDesign.surfaceElevated,
+        backgroundColor: AppDesign.surfaceElevatedOf(context),
         elevation: 0,
       ),
       body: Center(
@@ -24,20 +24,23 @@ class DashboardScreen extends StatelessWidget {
             Icon(
               Icons.dashboard_customize_outlined,
               size: 64,
-              color: AppDesign.primary.withValues(alpha: 0.3),
+              color: Theme.of(context)
+                  .colorScheme
+                  .primary
+                  .withValues(alpha: 0.3),
             ),
             const SizedBox(height: 16),
             Text(
               'Dashboard Coming Soon',
-              style: AppTextStyles.headline2.copyWith(
-                color: AppDesign.textSecondary,
+              style: AppTextStyles.headline2Of(context).copyWith(
+                color: AppDesign.textSecondaryOf(context),
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Summary and analytics will appear here.',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppDesign.textTertiary,
+              style: AppTextStyles.bodyMediumOf(context).copyWith(
+                color: AppDesign.textTertiaryOf(context),
               ),
             ),
           ],

@@ -14,7 +14,11 @@ class DatabaseHelper {
 
   static Database? _database;
   static const _dbName = 'field_expenses_v1.db';
-  static const _secureStorage = FlutterSecureStorage();
+  static const _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      resetOnError: true,
+    ),
+  );
   static const _kDbPassKey = 'db_pass_key';
 
   Future<Database> get database async {

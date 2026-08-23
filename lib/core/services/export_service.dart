@@ -40,21 +40,7 @@ class ExportService {
     final excel = Excel.createExcel();
     excel.delete('Sheet1');
 
-    // Header styling
-    final headerStyle = CellStyle(
-      bold: true,
-      backgroundColorHex: ExcelColor.blue700,
-      fontColorHex: ExcelColor.white,
-      horizontalAlign: HorizontalAlign.Center,
-    );
-
-    final boldStyle = CellStyle(bold: true);
-
     // Style for submitter sheet with vertical alignment
-    final submitterBoldStyle = CellStyle(
-      bold: true,
-      verticalAlign: VerticalAlign.Center,
-    );
     final submitterDataStyle = CellStyle(
       verticalAlign: VerticalAlign.Center,
     );
@@ -499,7 +485,7 @@ class ExportService {
     // Table Headers (starting from column 1, column 0 is already blank)
     final pivotHeaders = ['Expense Head', 'Sub Head', 'Amount with Bill', 'Amount without Bill', 'Sub-total'];
     // Insert empty cell at the beginning for the blank column
-    final headerRow = [TextCellValue('')]..addAll(pivotHeaders.map((e) => TextCellValue(e)).toList());
+    final headerRow = [TextCellValue(''), ...pivotHeaders.map((e) => TextCellValue(e))];
     summarySheet.appendRow(headerRow);
     final pivotHeaderRow = summaryRow;
     
@@ -870,14 +856,6 @@ class ExportService {
     int detailedRow = 0;
 
     // Styles for Detailed Entry sheet
-    final detailedHeaderStyle = CellStyle(
-      bold: true,
-      backgroundColorHex: ExcelColor.black,
-      fontColorHex: ExcelColor.white,
-      horizontalAlign: HorizontalAlign.Center,
-      verticalAlign: VerticalAlign.Center,
-    );
-    
     final detailedCenterHeaderStyle = CellStyle(
       bold: true,
       backgroundColorHex: ExcelColor.black,
@@ -1464,7 +1442,6 @@ class ExportService {
     
     final pdf = pw.Document();
     final dateFormat = DateFormat('dd MMM yyyy');
-    final dateRangeFormat = DateFormat('dd-MM-yyyy');
 
     // Calculate summary data (same as Excel export)
     final Map<String, Map<String, double>> pivotData = {};
@@ -1552,7 +1529,7 @@ class ExportService {
                     ),
                     pw.SizedBox(height: 6),
                     pw.Text(
-                      '${dateFormat.format(trip.startDate)} to ${trip.endDate != null ? dateFormat.format(trip.endDate!) : dateFormat.format(DateTime.now())} [${totalDays} ${totalDays == 1 ? 'Day' : 'Days'}]',
+                      '${dateFormat.format(trip.startDate)} to ${trip.endDate != null ? dateFormat.format(trip.endDate!) : dateFormat.format(DateTime.now())} [$totalDays ${totalDays == 1 ? 'Day' : 'Days'}]',
                       style: pw.TextStyle(
                         fontSize: 12,
                         color: PdfColors.grey300,
