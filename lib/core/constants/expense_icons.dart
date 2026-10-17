@@ -103,6 +103,18 @@ IconData getExpenseIcon(String head, String? subHead) {
     }
   }
 
+  // Subscription subheads
+  if (head == 'Subscription' && subHead != null) {
+    switch (subHead) {
+      case 'Software / App':
+        return Icons.apps_outlined;
+      case 'Others':
+        return Icons.more_horiz;
+      default:
+        return Icons.autorenew_rounded;
+    }
+  }
+
   // Fallback to head-level icons
   switch (head) {
     case 'Travel':
@@ -115,6 +127,8 @@ IconData getExpenseIcon(String head, String? subHead) {
       return Icons.event_note_outlined;
     case 'Miscellaneous':
       return Icons.receipt_outlined;
+    case 'Subscription':
+      return Icons.autorenew_rounded;
     default:
       return Icons.receipt_outlined;
   }

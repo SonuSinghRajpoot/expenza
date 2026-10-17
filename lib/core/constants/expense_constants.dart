@@ -5,7 +5,11 @@ class ExpenseConstants {
     'Food',
     'Event',
     'Miscellaneous',
+    'Subscription',
   ];
+
+  /// Heads where the city is optional (the expense is not tied to a place).
+  static const Set<String> headsWithOptionalCity = {'Subscription'};
 
   static const Map<String, List<String>> subHeads = {
     'Travel': ['Cab', 'Bus', 'Train', 'Flight', 'Fuel', 'Bike', 'Auto', 'E-Rickshaw', 'Local', 'Others'],
@@ -22,5 +26,6 @@ class ExpenseConstants {
       'Others',
     ],
     'Miscellaneous': ['Printing', 'Stationary', 'Others'],
+    'Subscription': ['Software / App', 'Others'],
   };
 }

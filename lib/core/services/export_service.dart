@@ -2002,6 +2002,7 @@ class ExportService {
       'Food': PdfColors.orange700,
       'Event': PdfColors.purple700,
       'Miscellaneous': PdfColors.grey700,
+      'Subscription': PdfColors.teal700,
     };
 
     // Calculate max bar width (available width minus padding and left column)

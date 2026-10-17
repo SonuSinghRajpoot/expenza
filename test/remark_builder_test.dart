@@ -76,6 +76,22 @@ void main() {
     });
   });
 
+  test('subscription has no city or pax', () {
+    expect(
+      RemarkBuilder.build(
+        head: 'Subscription',
+        subHead: 'Software / App',
+        fromCity: 'Delhi',
+        pax: 1,
+      ),
+      'Software / App subscription',
+    );
+    expect(
+      RemarkBuilder.build(head: 'Subscription', subHead: 'Others'),
+      'Subscription',
+    );
+  });
+
   test('same inputs always give the same remark', () {
     String build() => RemarkBuilder.build(
           head: 'Travel',

@@ -9,6 +9,7 @@
 ///   Accommodation/Hotel, Jaipur, 2 pax    → "Hotel stay in Jaipur for 2 persons"
 ///   Food/Lunch, Pune, 3 pax               → "Lunch in Pune for 3 persons"
 ///   Event/Printing Fee, Delhi             → "Printing Fee in Delhi"
+///   Subscription/Software / App           → "Software / App subscription"
 class RemarkBuilder {
   RemarkBuilder._();
 
@@ -73,6 +74,10 @@ class RemarkBuilder {
         break;
       case 'Miscellaneous':
         text = '${isOthers ? 'Miscellaneous expense' : sub}$inCity';
+        break;
+      case 'Subscription':
+        // Subscriptions are not tied to a place, so no city.
+        text = isOthers ? 'Subscription' : '$sub subscription';
         break;
       default:
         text = '${isOthers ? head : sub}$inCity';

@@ -93,10 +93,12 @@ class _ExpenseDetailViewScreenState
                   'End Date',
                   dateFormat.format(expense.endDate),
                 ),
-              _buildDetailRow(
-                expense.head == 'Travel' ? 'From Location' : 'Location',
-                expense.city,
-              ),
+              // City is optional for some heads (e.g. Subscription).
+              if (expense.city.trim().isNotEmpty)
+                _buildDetailRow(
+                  expense.head == 'Travel' ? 'From Location' : 'Location',
+                  expense.city,
+                ),
               if (expense.head == 'Travel' && expense.toCity != null)
                 _buildDetailRow('To Location', expense.toCity!),
               if (expense.pax != null)
@@ -522,6 +524,8 @@ class _ExpenseDetailViewScreenState
         return AppDesign.categoryEvent;
       case 'Miscellaneous':
         return AppDesign.categoryMisc;
+      case 'Subscription':
+        return AppDesign.categorySubscription;
       default:
         return AppDesign.categoryMisc;
     }

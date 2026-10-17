@@ -640,7 +640,11 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
     return FormField<String>(
       validator: (_) {
         final text = controller.text.trim();
-        if (text.isEmpty) return 'Required';
+        if (text.isEmpty) {
+          return ExpenseConstants.headsWithOptionalCity.contains(_selectedHead)
+              ? null
+              : 'Required';
+        }
         if (!_isAcceptedCity(text, cities)) {
           return 'Pick a city from the list';
         }
@@ -658,6 +662,10 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                 ? (isFrom ? 'From' : 'To')
                 : _selectedHead == 'Accommodation'
                     ? 'Location'
+                    : ExpenseConstants.headsWithOptionalCity.contains(
+                        _selectedHead,
+                      )
+                    ? 'City (Optional)'
                     : 'City',
           ),
           errorText: state.errorText,
@@ -1291,8 +1299,11 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
           final trip = trips.where((t) => t.id == widget.tripId).firstOrNull;
           if (trip == null) return;
 
-          final List<String> newCities = [cityName];
-          if (destinationName != null) newCities.add(destinationName);
+          final List<String> newCities = [
+            if (cityName.isNotEmpty) cityName,
+            if (destinationName != null && destinationName.isNotEmpty)
+              destinationName,
+          ];
 
           final currentCities = List<String>.from(trip.cities);
           bool modified = false;

@@ -63,7 +63,7 @@ class ExpenseListItemWidget extends StatelessWidget {
                       ),
                       const Gap(2),
                       Text(
-                        '${dateFormat.format(expense.startDate).toUpperCase()} • ${expense.city}${expense.toCity != null && expense.toCity != expense.city ? ' \u2192 ${expense.toCity}' : ''}',
+                        '${dateFormat.format(expense.startDate).toUpperCase()}${expense.city.isNotEmpty ? ' • ${expense.city}' : ''}${expense.toCity != null && expense.toCity!.isNotEmpty && expense.toCity != expense.city ? ' \u2192 ${expense.toCity}' : ''}',
                         style: AppTextStyles.bodySmallOf(context),
                       ),
                       if (expense.notes != null && expense.notes!.trim().isNotEmpty) ...[
@@ -138,6 +138,8 @@ class ExpenseListItemWidget extends StatelessWidget {
         return AppDesign.categoryFood;
       case 'Event':
         return AppDesign.categoryEvent;
+      case 'Subscription':
+        return AppDesign.categorySubscription;
       default:
         return AppDesign.categoryMisc;
     }

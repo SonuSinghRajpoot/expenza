@@ -61,7 +61,7 @@ class GeminiService {
         '   - Return the Net Amount Paid / Balance Settled after applying any advance payment, promo voucher, or coupon.\n'
         '5. Never return the pre-discount total or base fare when discounts/deductions are present.\n\n'
         'Meal: Breakfast 4-12, Lunch 12-16, Snacks 16-19, Dinner 19-4. No time: infer.\n'
-        'Merchant logic: Be smart with merchant names. If Uber, Ola, Rapido, BluSmart, or similar cab/bike keywords appear, infer Travel head with Cab or Bike subHead. Swiggy/Zomato -> Food. OYO/MakeMyTrip (hotels) -> Accommodation. Use merchant context to infer appropriate head and subHead from the allowed list.\n'
+        'Merchant logic: Be smart with merchant names. If Uber, Ola, Rapido, BluSmart, or similar cab/bike keywords appear, infer Travel head with Cab or Bike subHead. Swiggy/Zomato -> Food. OYO/MakeMyTrip (hotels) -> Accommodation. Recurring software/app plans (Google Workspace, Microsoft 365, Adobe, Zoom, Canva, ChatGPT, cloud storage, app store subscriptions) -> Subscription with subHead "Software / App". Use merchant context to infer appropriate head and subHead from the allowed list.\n'
         'If a field cannot be determined, use null. Do not guess dates or amounts.$multiPageHint';
   }
 
@@ -84,7 +84,7 @@ class GeminiService {
         '   - Return the Net Amount Paid / Balance Settled after applying any advance payment, promo voucher, or coupon.\n'
         '5. Never return the pre-discount total or base fare when discounts/deductions are present.\n\n'
         'Meal: Breakfast 4-12, Lunch 12-16, Snacks 16-19, Dinner 19-4. No time: infer.\n'
-        'Merchant logic: Be smart with merchant names. If Uber, Ola, Rapido, BluSmart, or similar cab/bike keywords appear, infer Travel head with Cab or Bike subHead. Swiggy/Zomato -> Food. OYO/MakeMyTrip (hotels) -> Accommodation. Use merchant context to infer appropriate head and subHead from the allowed list.\n'
+        'Merchant logic: Be smart with merchant names. If Uber, Ola, Rapido, BluSmart, or similar cab/bike keywords appear, infer Travel head with Cab or Bike subHead. Swiggy/Zomato -> Food. OYO/MakeMyTrip (hotels) -> Accommodation. Recurring software/app plans (Google Workspace, Microsoft 365, Adobe, Zoom, Canva, ChatGPT, cloud storage, app store subscriptions) -> Subscription with subHead "Software / App". Use merchant context to infer appropriate head and subHead from the allowed list.\n'
         'If a field cannot be determined, use null. Do not guess dates or amounts.\n\n'
         '--- RECEIPT OCR TEXT ---\n'
         '$ocrText';

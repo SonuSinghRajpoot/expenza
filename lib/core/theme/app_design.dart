@@ -91,6 +91,7 @@ class AppDesign {
   static const Color categoryFood = Color(0xFFF59E0B);
   static const Color categoryEvent = Color(0xFF8B5CF6);
   static const Color categoryMisc = Color(0xFF6B7280);
+  static const Color categorySubscription = Color(0xFF0D9488);
 
   // --- COMPONENT SPECIFIC ---
 
