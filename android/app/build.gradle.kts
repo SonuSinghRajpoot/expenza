@@ -16,7 +16,12 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.fieldexpensemanager.field_expense_manager"
-    compileSdk = 37
+    // Android 17 is published as SDK platform "android-37.0" (minor API level 0).
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 0
+        }
+    }
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
