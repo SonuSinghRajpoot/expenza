@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.os.Bundle
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -15,6 +16,7 @@ import java.util.UUID
 
 class MainActivity : FlutterFragmentActivity() {
     private val PDF_RENDERER_CHANNEL = "com.fieldexpensemanager/pdf_renderer"
+    private val APP_UPDATE_CHANNEL = "com.fieldexpensemanager/app_update"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // When Android relaunches the activity from Recents, or recreates it after
@@ -37,6 +39,15 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Device ABIs in order of preference, used to pick the right split APK
+        // from a GitHub release (e.g. app-arm64-v8a-release.apk).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, APP_UPDATE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getSupportedAbis" -> result.success(Build.SUPPORTED_ABIS.toList())
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PDF_RENDERER_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {

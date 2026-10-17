@@ -28,3 +28,15 @@ Restore point for the previous version: git tag `restore/v1.2.1-before-fixes` (s
 
 ## Tests
 `test/indian_city_resolver_test.dart`, `test/remark_builder_test.dart`, `test/gemini_normalize_result_test.dart`
+
+## Also in this version
+- New **Subscription** head (sub-heads: Software / App, Others). City is optional for this head.
+- Consistent outlined icons for every head and sub-head.
+- City dropdown panel height is capped and the panel scrolls.
+- **In-app updates from GitHub Releases:** checks once a day after launch, plus **Profile → App Updates → Check for updates**. Shows the release notes, downloads the right APK for the phone and opens the Android installer.
+
+## How to publish an update so phones pick it up
+1. Bump `version:` in `pubspec.yaml` (e.g. `1.2.3+10`).
+2. Build with the **same signing key** as the installed app: `flutter build apk --release --split-per-abi` (a single universal APK also works).
+3. Create a GitHub Release on `SonuSinghRajpoot/expenza` with tag `v1.2.3` (it must match the pubspec version) and attach the APK file(s). Don't mark it as a draft or pre-release.
+4. The release description is shown as "What's new" in the app.

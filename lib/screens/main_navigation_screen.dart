@@ -5,6 +5,7 @@ import '../core/theme/app_design.dart';
 import '../core/theme/app_text_styles.dart';
 import '../core/theme/app_icons.dart';
 import '../core/theme/premium_icon.dart';
+import '../widgets/app_update_dialog.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -21,6 +22,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _selectedIndex);
+
+    // Look for a newer GitHub release shortly after the app opens (at most
+    // once a day; see AppUpdateService.autoCheckInterval).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted) AppUpdateFlow.checkOnLaunch(context);
+      });
+    });
   }
 
   @override

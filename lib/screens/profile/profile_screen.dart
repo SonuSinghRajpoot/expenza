@@ -20,6 +20,7 @@ import '../../core/theme/premium_icon.dart';
 import '../../core/services/error_handler.dart';
 import '../../core/constants/build_info.dart';
 import '../../core/services/biometric_service.dart';
+import '../../widgets/app_update_dialog.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -29,6 +30,8 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _checkingForUpdate = false;
+
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileProvider);
@@ -208,6 +211,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _buildGeminiSection(context),
                 const Gap(24),
                 _buildAccountBackupSection(context),
+                const Gap(24),
+                _buildAppUpdateSection(context),
                 const Gap(24),
                 _buildDataStorageNotice(context),
                 const Gap(40),
@@ -417,6 +422,85 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 },
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAppUpdateSection(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'APP UPDATES',
+            style: AppTextStyles.captionOf(context).copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppDesign.itemBorderRadius),
+            onTap: _checkingForUpdate
+                ? null
+                : () async {
+                    setState(() => _checkingForUpdate = true);
+                    await AppUpdateFlow.checkManually(context);
+                    if (mounted) setState(() => _checkingForUpdate = false);
+                  },
+            child: Ink(
+              decoration: AppDesign.cardDecoration(
+                context: context,
+                borderRadius: AppDesign.itemBorderRadius,
+              ),
+              padding: const EdgeInsets.all(AppDesign.cardInternalPadding),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: 0.12),
+                      borderRadius:
+                          BorderRadius.circular(AppDesign.smallBorderRadius),
+                    ),
+                    child: Icon(Icons.system_update_outlined, size: 20, color: primary),
+                  ),
+                  const Gap(12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Check for updates',
+                          style: AppTextStyles.bodyMediumOf(context).copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'Download the latest version from GitHub',
+                          style: AppTextStyles.captionOf(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _checkingForUpdate
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppDesign.textTertiaryOf(context),
+                        ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
