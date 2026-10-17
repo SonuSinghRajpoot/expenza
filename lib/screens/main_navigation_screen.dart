@@ -26,8 +26,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     super.initState();
     _pageController = PageController(initialPage: _selectedIndex);
 
-    // Look for a newer GitHub release shortly after the app opens (at most
-    // once a day; see AppUpdateService.autoCheckInterval).
+    // Look for a newer GitHub release shortly after the app opens (once per
+    // launch, never during a share; see AppUpdateFlow.checkOnLaunch).
     _updateCheckTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) AppUpdateFlow.checkOnLaunch(context);
     });

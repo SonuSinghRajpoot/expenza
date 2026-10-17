@@ -12,6 +12,7 @@ import '../screens/expense_form/expense_form.dart';
 import '../screens/expense_form/add_expense_options_dialog.dart';
 import '../core/constants/expense_constants.dart';
 import '../core/services/biometric_service.dart';
+import '../core/services/share_session.dart';
 import '../core/theme/app_design.dart';
 import '../core/utils/image_utils.dart';
 import '../core/utils/permission_utils.dart';
@@ -48,6 +49,7 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
 
     if (kIsWeb) {
       _initialShareChecked = true;
+      ShareSession.markInitialShareChecked(launchedWithShare: false);
     } else {
       // For sharing files coming from outside the app while the app is in memory
       _intentDataStreamSubscription = ReceiveSharingIntent.instance
@@ -73,6 +75,9 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
           })
           .whenComplete(() {
             _initialShareChecked = true;
+            ShareSession.markInitialShareChecked(
+              launchedWithShare: _launchedWithShare,
+            );
             _maybeRequestLaunchPermissions();
           });
     }
@@ -126,6 +131,7 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
         'SharingListener: App is locked. Holding ${validFiles.length} shared files until unlock.',
       );
       _pendingSharedFiles = validFiles;
+      ShareSession.hasPendingShare = true;
       return;
     }
 
@@ -133,7 +139,14 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
   }
 
   void _enqueueShare(List<SharedMediaFile> files) {
-    _shareQueue = _shareQueue.then((_) => _handleSharedFiles(files));
+    ShareSession.begin(); // counted from queueing until the share is handled
+    _shareQueue = _shareQueue.then((_) async {
+      try {
+        await _handleSharedFiles(files);
+      } finally {
+        ShareSession.end();
+      }
+    });
   }
 
   Future<void> _handleSharedFiles(List<SharedMediaFile> files) async {
@@ -271,7 +284,12 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
       if (!isUnlocked) return;
       final pending = _pendingSharedFiles;
       _pendingSharedFiles = null;
+      ShareSession.hasPendingShare = false;
+      if (pending != null && pending.isNotEmpty) {
+        ShareSession.begin(); // keep the share counted until it is queued
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (pending != null && pending.isNotEmpty) ShareSession.end();
         if (!mounted) return;
         if (pending != null && pending.isNotEmpty) {
           _enqueueShare(pending);

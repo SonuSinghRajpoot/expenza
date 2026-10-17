@@ -78,10 +78,13 @@ In the Android share sheet, always pick **Expenza Debug**.
 ## G. New: App updates from GitHub
 | # | Steps | Expected | ✔ |
 |---|---|---|---|
-| G1 | Open the app and wait ~5 seconds on the main screen. | An **"Update available"** dialog appears for **v1.2.0**, showing release notes, file name and size. (It appears at most once a day.) | [ ] |
+| G1 | Open the app normally (from the launcher) and wait ~5 seconds on the main screen. | An **"Update available"** dialog appears for **v1.2.0**, showing release notes, file name and size. | [ ] |
+| G1b | Tap **Later**, swipe the app away in Recents, and open it again. | The dialog appears again: the check runs on **every launch**. | [ ] |
+| G1c | Swipe the app away, then **share a PDF** to Expenza Debug. Finish or cancel the share. | **No** update dialog during or after that share. (Launches that come from a share skip the check.) | [ ] |
+| G1d | With the app in the background, share a PDF to it. | The share flow is never interrupted by the update dialog. | [ ] |
 | G2 | Tap **Later**. Then go to **Profile → App Updates → Check for updates**. | The dialog appears again (manual checks always run). | [ ] |
 | G3 | Tap **Update**. | A progress bar downloads `app-arm64-v8a-release.apk` (~46 MB). Android may ask you to allow **"Install unknown apps"** for Expenza Debug. Then the Android installer opens. **Tap Cancel in the installer.** (Installing would target your real app, and Android blocks it anyway, because v1.2.0 is older than your 1.2.1.) | [ ] |
-| G4 | Check for updates again → **Skip version**. Close and reopen the app. | No automatic dialog for v1.2.0. A manual check still shows it. | [ ] |
+| G4 | Check for updates again → **Skip version**. Swipe the app away and reopen it. | No automatic dialog for v1.2.0 on any launch. A manual check still shows it. | [ ] |
 | G5 | Turn on airplane mode → Check for updates. | Message: "Could not reach GitHub. Check your internet connection." | [ ] |
 
 ## H. Quick regression

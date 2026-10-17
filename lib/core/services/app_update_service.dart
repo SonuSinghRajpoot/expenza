@@ -65,8 +65,6 @@ class AppUpdateService {
   static const String _latestReleaseApi =
       'https://api.github.com/repos/$repository/releases/latest';
 
-  static const Duration autoCheckInterval = Duration(hours: 24);
-  static const String _prefLastCheck = 'app_update_last_check_ms';
   static const String _prefSkippedTag = 'app_update_skipped_tag';
   static const String _apkMimeType = 'application/vnd.android.package-archive';
 
@@ -81,23 +79,14 @@ class AppUpdateService {
 
   /// Checks for an update.
   ///
-  /// Automatic checks ([manual] false) run at most once per
-  /// [autoCheckInterval] and ignore a version the user chose to skip.
-  /// Manual checks always run and always report the result.
+  /// Automatic checks ([manual] false) ignore a version the user chose to
+  /// skip; manual checks always report it.
   static Future<UpdateCheckResult> checkForUpdate({bool manual = false}) async {
     if (!isSupported) {
       return const UpdateCheckResult(UpdateCheckStatus.notSupported);
     }
 
     final prefs = await SharedPreferences.getInstance();
-    if (!manual) {
-      final lastCheck = prefs.getInt(_prefLastCheck);
-      final now = DateTime.now().millisecondsSinceEpoch;
-      if (lastCheck != null &&
-          now - lastCheck < autoCheckInterval.inMilliseconds) {
-        return const UpdateCheckResult(UpdateCheckStatus.skipped);
-      }
-    }
 
     final info = await PackageInfo.fromPlatform();
     final currentVersion = info.version;
@@ -112,7 +101,6 @@ class AppUpdateService {
 
       if (response.statusCode == 404) {
         // No published release yet.
-        await prefs.setInt(_prefLastCheck, DateTime.now().millisecondsSinceEpoch);
         return UpdateCheckResult(
           UpdateCheckStatus.upToDate,
           currentVersion: currentVersion,
@@ -121,8 +109,6 @@ class AppUpdateService {
       if (response.statusCode != 200) {
         throw HttpException('GitHub returned ${response.statusCode}');
       }
-
-      await prefs.setInt(_prefLastCheck, DateTime.now().millisecondsSinceEpoch);
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final tagName = (json['tag_name'] ?? '').toString();

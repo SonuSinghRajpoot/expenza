@@ -3,6 +3,7 @@ import 'package:gap/gap.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/services/app_update_service.dart';
+import '../core/services/share_session.dart';
 import '../core/theme/app_design.dart';
 import '../core/theme/app_text_styles.dart';
 
@@ -12,17 +13,41 @@ class AppUpdateFlow {
 
   static bool _inProgress = false;
 
-  /// Automatic check after launch: silent unless an update is available.
+  static bool _launchCheckDone = false;
+
+  /// Automatic check, once per app launch: silent unless an update is
+  /// available. Skipped for a launch that came from sharing a file into the
+  /// app, and never shown while a share is being handled.
   static Future<void> checkOnLaunch(BuildContext context) async {
-    // Don't interrupt a share, a form or another dialog; try again next launch.
-    if (_inProgress || ModalRoute.of(context)?.isCurrent != true) return;
+    if (_launchCheckDone || _inProgress) return;
     _inProgress = true;
     try {
+      // Wait until the share listener knows whether this launch was a share.
+      await ShareSession.initialShareChecked.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {},
+      );
+      if (ShareSession.launchedWithShare) {
+        _launchCheckDone = true; // the user is here to share, not to update
+        return;
+      }
+      // A share, form or dialog is open: try again when the main screen is
+      // shown next in this launch (e.g. after unlocking).
+      if (!context.mounted ||
+          ShareSession.isHandlingShare ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
+      _launchCheckDone = true;
+
       final result = await AppUpdateService.checkForUpdate();
       if (result.status == UpdateCheckStatus.updateAvailable &&
           context.mounted &&
+          !ShareSession.isHandlingShare &&
           ModalRoute.of(context)?.isCurrent == true) {
         await _showDialog(context, result);
+      } else if (result.status == UpdateCheckStatus.failed) {
+        _launchCheckDone = false; // e.g. offline: retry when the main screen opens next
       }
     } finally {
       _inProgress = false;
