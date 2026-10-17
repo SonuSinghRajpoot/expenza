@@ -63,10 +63,23 @@ android {
         }
         release {
             val releaseConfig = signingConfigs.findByName("release")
-            signingConfig = if (releaseConfig?.storeFile?.exists() == true) {
+            val hasReleaseKey = releaseConfig?.storeFile?.exists() == true
+            // Never ship a release APK signed with a debug key: Android refuses
+            // to install it as an update over a properly signed app (this is how
+            // v1.2.0 ended up debug-signed). Fail release builds instead.
+            val buildingRelease = gradle.startParameter.taskNames.any {
+                it.contains("Release", ignoreCase = true)
+            }
+            if (buildingRelease && !hasReleaseKey) {
+                throw GradleException(
+                    "Release signing key not found. Set storeFile in android/key.properties " +
+                        "to your expenza-keystore.jks before building a release."
+                )
+            }
+            signingConfig = if (hasReleaseKey) {
                 releaseConfig
             } else {
-                signingConfigs.getByName("debug") // Fallback for local build / CI
+                signingConfigs.getByName("debug") // only reached for non-release tasks
             }
             isMinifyEnabled = false // Set to true after adding ProGuard rules
             isShrinkResources = false // Set to true when minifyEnabled is true
