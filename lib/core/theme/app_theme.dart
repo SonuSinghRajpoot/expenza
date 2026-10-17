@@ -7,6 +7,35 @@ import 'app_design.dart';
 /// Light and Dark modes conforming to Android edge-to-edge guidelines.
 class AppTheme {
   /// Light Theme Configuration
+  /// Material 3's default off-state thumb uses `outline`, which matches the
+  /// track colour in this palette and made the thumb invisible. Use an
+  /// explicit mid-grey thumb and outline when off, and a white thumb on the
+  /// primary track when on, so both states are clearly visible.
+  static SwitchThemeData _switchTheme(
+    ColorScheme scheme, {
+    required Color offThumb,
+  }) {
+    return SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.disabled)) {
+          return offThumb.withValues(alpha: 0.5);
+        }
+        return states.contains(WidgetState.selected) ? scheme.onPrimary : offThumb;
+      }),
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return states.contains(WidgetState.disabled)
+              ? scheme.primary.withValues(alpha: 0.4)
+              : scheme.primary;
+        }
+        return scheme.surfaceContainerHighest;
+      }),
+      trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+        return states.contains(WidgetState.selected) ? Colors.transparent : offThumb;
+      }),
+    );
+  }
+
   static ThemeData get lightTheme {
     const colorScheme = ColorScheme(
       brightness: Brightness.light,
@@ -32,6 +61,7 @@ class AppTheme {
       brightness: Brightness.light,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppDesign.surface,
+      switchTheme: _switchTheme(colorScheme, offThumb: const Color(0xFF94A3B8)),
       textTheme: GoogleFonts.outfitTextTheme().apply(
         bodyColor: AppDesign.textPrimary,
         displayColor: AppDesign.textPrimary,
@@ -140,6 +170,7 @@ class AppTheme {
       brightness: Brightness.dark,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppDesign.darkSurface,
+      switchTheme: _switchTheme(colorScheme, offThumb: const Color(0xFF8A8A8A)),
       textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).apply(
         bodyColor: AppDesign.darkTextPrimary,
         displayColor: AppDesign.darkTextPrimary,

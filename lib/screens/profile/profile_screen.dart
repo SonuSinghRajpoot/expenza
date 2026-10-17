@@ -405,7 +405,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               Switch(
                 value: isAppLockEnabled,
-                activeThumbColor: Theme.of(context).colorScheme.primary,
                 onChanged: (val) async {
                   final success =
                       await ref.read(appLockEnabledProvider.notifier).toggle(val);
