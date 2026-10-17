@@ -50,6 +50,7 @@ android/.gradle/
 
 # Android signing keys (CRITICAL - never commit these!)
 android/key.properties
+/expenza-keystore.jks
 *.keystore
 *.jks
 *.p12
