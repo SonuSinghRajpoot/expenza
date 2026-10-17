@@ -84,6 +84,11 @@ In the Android share sheet, always pick **Expenza Debug**.
 | G1d | With the app in the background, share a PDF to it. | The share flow is never interrupted by the update dialog. | [ ] |
 | G2 | Tap **Later**. Then go to **Profile → App Updates → Check for updates**. | The dialog appears again (manual checks always run). | [ ] |
 | G3 | Tap **Update**. | A progress bar downloads `app-arm64-v8a-release.apk` (~46 MB). Android may ask you to allow **"Install unknown apps"** for Expenza Debug. Then the Android installer opens. **Tap Cancel in the installer.** (Installing would target your real app, and Android blocks it anyway, because v1.2.0 is older than your 1.2.1.) | [ ] |
+| G3a | With **at least one Active trip**, tap **Update** in the update dialog. | A **"Back up your reports first"** warning lists your active trips with when their Excel/PDF were last saved, and offers **Generate reports**, **Update without backup** and **Cancel**. | [ ] |
+| G3b | Tap **Generate reports**. | A progress bar counts the files; then "Saved N files to Internal storage › Expenza". Check that the `.xlsx` and `.pdf` files exist in that folder. **Continue update** then starts the download. | [ ] |
+| G3c | Set all trips to submitted (none Active), with at least one submitted trip that has never been exported. Tap **Update**. | The warning says there are no active trips and lists only the submitted trips **missing** an Excel or PDF report. | [ ] |
+| G3d | Same as G3c, but every submitted trip already has both reports. Tap **Update**. | No warning; the download starts straight away. | [ ] |
+| G3e | In the warning, tap **Cancel**. | Back to the update dialog; nothing is downloaded. | [ ] |
 | G4 | Check for updates again → **Skip version**. Swipe the app away and reopen it. | No automatic dialog for v1.2.0 on any launch. A manual check still shows it. | [ ] |
 | G5 | Turn on airplane mode → Check for updates. | Message: "Could not reach GitHub. Check your internet connection." | [ ] |
 

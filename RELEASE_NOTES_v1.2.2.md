@@ -33,6 +33,7 @@ Restore point for the previous version: git tag `restore/v1.2.1-before-fixes` (s
 - New **Subscription** head (sub-heads: Software / App, Others). City is optional for this head.
 - Consistent outlined icons for every head and sub-head.
 - City dropdown panel height is capped and the panel scrolls.
+- **Back up before updating:** tapping Update first suggests saving the Excel and PDF reports. With active trips it lists them; with none, it lists submitted trips that have no report yet. It can generate them in one tap.
 - **In-app updates from GitHub Releases:** checks on every app launch (never during or after a launch from a shared file), plus **Profile → App Updates → Check for updates**. Shows the release notes, downloads the right APK for the phone and opens the Android installer.
 
 ## How to publish an update so phones pick it up

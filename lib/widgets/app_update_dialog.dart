@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/services/app_update_service.dart';
 import '../core/services/share_session.dart';
+import '../core/services/trip_report_backup.dart';
 import '../core/theme/app_design.dart';
 import '../core/theme/app_text_styles.dart';
 
@@ -121,11 +123,40 @@ class AppUpdateDialog extends StatefulWidget {
 }
 
 class _AppUpdateDialogState extends State<AppUpdateDialog> {
+  bool _backupChecked = false;
+  bool _checkingBackup = false;
   bool _downloading = false;
   double? _progress;
   String? _error;
 
+  /// Before the first download, suggest saving Excel/PDF reports. Returns
+  /// false if the user cancelled.
+  Future<bool> _confirmBackup() async {
+    if (_backupChecked) return true;
+    setState(() => _checkingBackup = true);
+    ReportBackupAdvice? advice;
+    try {
+      advice = await TripReportBackup.assess();
+    } catch (e) {
+      debugPrint('AppUpdateDialog: could not check reports: $e');
+    }
+    if (!mounted) return false;
+    setState(() => _checkingBackup = false);
+    if (advice == null || advice.isEmpty) {
+      _backupChecked = true;
+      return true;
+    }
+    final proceed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => BackupBeforeUpdateDialog(advice: advice!),
+    );
+    if (proceed == true) _backupChecked = true;
+    return proceed == true;
+  }
+
   Future<void> _update() async {
+    if (!await _confirmBackup() || !mounted) return;
     setState(() {
       _downloading = true;
       _progress = null;
@@ -218,6 +249,15 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
                   ),
                 ),
               ],
+              if (_checkingBackup) ...[
+                const Gap(16),
+                const LinearProgressIndicator(),
+                const Gap(6),
+                Text(
+                  'Checking your trip reports…',
+                  style: AppTextStyles.captionOf(context),
+                ),
+              ],
               if (_downloading) ...[
                 const Gap(16),
                 LinearProgressIndicator(value: _progress),
@@ -246,7 +286,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
             ],
           ),
         ),
-        actions: _downloading
+        actions: _downloading || _checkingBackup
             ? const []
             : [
                 TextButton(onPressed: _skip, child: const Text('Skip version')),
@@ -278,5 +318,204 @@ class _AppUpdateDialogState extends State<AppUpdateDialog> {
       lines.add(line);
     }
     return lines.join('\n').trim();
+  }
+}
+
+/// Suggests saving Excel and PDF reports before updating, and can generate
+/// them. Pops true to continue with the update, false to cancel.
+class BackupBeforeUpdateDialog extends StatefulWidget {
+  final ReportBackupAdvice advice;
+
+  const BackupBeforeUpdateDialog({super.key, required this.advice});
+
+  @override
+  State<BackupBeforeUpdateDialog> createState() =>
+      _BackupBeforeUpdateDialogState();
+}
+
+class _BackupBeforeUpdateDialogState extends State<BackupBeforeUpdateDialog> {
+  static final DateFormat _dateFormat = DateFormat('d MMM yyyy, h:mm a');
+
+  bool _generating = false;
+  int _done = 0;
+  int _total = 0;
+  List<String>? _savedPaths;
+  String? _error;
+
+  Future<void> _generate() async {
+    setState(() {
+      _generating = true;
+      _error = null;
+      _done = 0;
+      _total = widget.advice.tripsToExport.length * 2;
+    });
+    try {
+      final paths = await TripReportBackup.generate(
+        widget.advice.tripsToExport,
+        onProgress: (done, total) {
+          if (mounted) setState(() => _done = done);
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _generating = false;
+        _savedPaths = paths;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _generating = false;
+        _error = 'Could not generate the reports. You can export them from '
+            'each trip, or update without a backup.';
+      });
+    }
+  }
+
+  String _statusLine(TripReportStatus s) {
+    String saved(DateTime? at) =>
+        at == null ? 'missing' : _dateFormat.format(at);
+    if (widget.advice.hasActiveTrips) {
+      if (!s.hasExcel && !s.hasPdf) return 'No reports saved yet';
+      return 'Excel: ${saved(s.excelSavedAt)} · PDF: ${saved(s.pdfSavedAt)}';
+    }
+    final missing = [if (!s.hasExcel) 'Excel', if (!s.hasPdf) 'PDF'];
+    return '${s.trip.status} · Missing: ${missing.join(' and ')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final advice = widget.advice;
+    final items =
+        advice.hasActiveTrips ? advice.activeTrips : advice.submittedMissing;
+    final saved = _savedPaths;
+
+    final intro = advice.hasActiveTrips
+        ? 'Updating keeps your data, but it is safest to have a copy. '
+              'Generate the Excel and PDF reports of your active '
+              '${items.length == 1 ? 'trip' : 'trips'} before updating.'
+        : 'You have no active trips. Make a backup copy of the Excel and PDF '
+              'reports of these submitted trips, which have not been '
+              'generated yet.';
+
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: AppDesign.screenHorizontalPadding,
+          vertical: AppDesign.screenVerticalPadding,
+        ),
+        icon: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+        title: const Text('Back up your reports first'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(intro, style: AppTextStyles.bodyMediumOf(context)),
+              const Gap(12),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200),
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final s in items)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              s.trip.name,
+                              style: AppTextStyles.bodyMediumOf(
+                                context,
+                              ).copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              _statusLine(s),
+                              style: AppTextStyles.captionOf(context),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (_generating) ...[
+                const Gap(8),
+                LinearProgressIndicator(
+                  value: _total == 0 ? null : _done / _total,
+                ),
+                const Gap(6),
+                Text(
+                  'Generating reports… $_done of $_total',
+                  style: AppTextStyles.captionOf(context),
+                ),
+              ],
+              if (saved != null) ...[
+                const Gap(8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 20,
+                    ),
+                    const Gap(8),
+                    Expanded(
+                      child: Text(
+                        saved.isEmpty
+                            ? 'No reports were saved.'
+                            : 'Saved ${saved.length} '
+                                  '${saved.length == 1 ? 'file' : 'files'} to '
+                                  '${TripReportBackup.folderLabel(saved.first)}.',
+                        style: AppTextStyles.bodySmallOf(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (_error != null) ...[
+                const Gap(8),
+                Text(
+                  _error!,
+                  style: AppTextStyles.bodySmallOf(
+                    context,
+                  ).copyWith(color: AppDesign.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: _generating
+            ? const []
+            : saved != null
+            ? [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Continue update'),
+                ),
+              ]
+            : [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Update without backup'),
+                ),
+                FilledButton(
+                  onPressed: _generate,
+                  child: const Text('Generate reports'),
+                ),
+              ],
+      ),
+    );
   }
 }
