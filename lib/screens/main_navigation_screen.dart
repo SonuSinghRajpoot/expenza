@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'dashboard/expenses_list_screen.dart';
 import 'profile/profile_screen.dart';
@@ -17,6 +19,7 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
   late PageController _pageController;
+  Timer? _updateCheckTimer;
 
   @override
   void initState() {
@@ -25,15 +28,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     // Look for a newer GitHub release shortly after the app opens (at most
     // once a day; see AppUpdateService.autoCheckInterval).
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(seconds: 4), () {
-        if (mounted) AppUpdateFlow.checkOnLaunch(context);
-      });
+    _updateCheckTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted) AppUpdateFlow.checkOnLaunch(context);
     });
   }
 
   @override
   void dispose() {
+    _updateCheckTimer?.cancel();
     _pageController.dispose();
     super.dispose();
   }

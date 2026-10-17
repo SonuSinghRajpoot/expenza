@@ -28,7 +28,7 @@ class RemarkBuilder {
     'Local': 'local conveyance',
   };
 
-  /// Ticketed modes read "from <city>" when only one city is known.
+  /// Ticketed modes read "from CITY" when only one city is known.
   static const Set<String> _ticketedModes = {'Flight', 'Train', 'Bus'};
 
   static String build({
@@ -50,7 +50,7 @@ class RemarkBuilder {
     String text;
     switch (head) {
       case 'Travel':
-        final phrase = isOthers ? 'travel' : (_travelPhrases[sub] ?? sub!.toLowerCase());
+        final phrase = isOthers ? 'travel' : (_travelPhrases[sub] ?? sub.toLowerCase());
         final hasRoute =
             from != null && to != null && from.toLowerCase() != to.toLowerCase();
         if (hasRoute) {

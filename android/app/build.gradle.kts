@@ -32,6 +32,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["appLabel"] = "Expenza"
     }
 
     signingConfigs {
@@ -49,6 +50,12 @@ android {
     }
 
     buildTypes {
+        // Debug builds install next to the real app instead of replacing it,
+        // so testing never touches real expense data.
+        debug {
+            applicationIdSuffix = ".debug"
+            manifestPlaceholders["appLabel"] = "Expenza Debug"
+        }
         release {
             val releaseConfig = signingConfigs.findByName("release")
             signingConfig = if (releaseConfig?.storeFile?.exists() == true) {
