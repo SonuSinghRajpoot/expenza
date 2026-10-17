@@ -1,6 +1,8 @@
 package com.fieldexpensemanager.field_expense_manager
 
+import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Bundle
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
@@ -13,6 +15,25 @@ import java.util.UUID
 
 class MainActivity : FlutterFragmentActivity() {
     private val PDF_RENDERER_CHANNEL = "com.fieldexpensemanager/pdf_renderer"
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        // When Android relaunches the activity from Recents, or recreates it after
+        // process death, it replays the ORIGINAL launch intent. If that was a share,
+        // receive_sharing_intent would report the old files as a brand-new share.
+        // Swap in a plain launcher intent before plugins read it.
+        val launchIntent = intent
+        val isShare = launchIntent?.action == Intent.ACTION_SEND ||
+            launchIntent?.action == Intent.ACTION_SEND_MULTIPLE
+        val fromHistory = launchIntent != null &&
+            (launchIntent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
+        if (isShare && (fromHistory || savedInstanceState != null)) {
+            intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+                setPackage(packageName)
+            }
+        }
+        super.onCreate(savedInstanceState)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

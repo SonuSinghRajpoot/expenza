@@ -25,10 +25,22 @@ class DatabaseHelper {
   static const String _kAppMasterPassKey =
       'Expenza_2026_Unified_Master_Key_f9a8e7d6c5b4a3_@96535';
 
+  static Future<Database>? _openingDatabase;
+
+  /// Returns the shared database, opening it at most once.
+  /// Concurrent callers during cold start (trip list, Gemini keys, profile,
+  /// share intent) all await the same open instead of racing separate opens.
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+    _openingDatabase ??= _initDatabase();
+    try {
+      _database = await _openingDatabase!;
+      return _database!;
+    } catch (_) {
+      // Allow a later caller to retry the open instead of caching the failure.
+      _openingDatabase = null;
+      rethrow;
+    }
   }
 
   Future<Database> _initDatabase() async {

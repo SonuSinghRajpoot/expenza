@@ -26,45 +26,60 @@ class SharingListener extends ConsumerStatefulWidget {
 }
 
 class _SharingListenerState extends ConsumerState<SharingListener> {
+  /// The same intent can be reported twice in quick succession (initial media
+  /// plus stream on some devices). Identical shares inside this window are dropped.
+  static const Duration _duplicateShareWindow = Duration(seconds: 3);
+
   StreamSubscription? _intentDataStreamSubscription;
-  bool _launchPermissionsRequested = false;
   List<SharedMediaFile>? _pendingSharedFiles;
+
+  /// Shares are processed strictly one after another so dialogs never stack.
+  Future<void> _shareQueue = Future.value();
+  String? _lastShareSignature;
+  DateTime? _lastShareAt;
+
+  bool _initialShareChecked = false;
+  bool _launchedWithShare = false;
+  bool _launchPermissionsRequested = false;
 
   @override
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_launchPermissionsRequested) {
-        _launchPermissionsRequested = true;
-        PermissionUtils.requestLaunchPermissions();
-      }
-    });
-
-    if (!kIsWeb) {
-      // For sharing images coming from outside the app while the app is in the memory
+    if (kIsWeb) {
+      _initialShareChecked = true;
+    } else {
+      // For sharing files coming from outside the app while the app is in memory
       _intentDataStreamSubscription = ReceiveSharingIntent.instance
           .getMediaStream()
           .listen(
-            (List<SharedMediaFile> value) {
-              if (mounted) {
-                _handleSharedFiles(value);
-              }
-            },
+            _onSharedFiles,
             onError: (err) {
-              debugPrint("getMediaStream error: $err");
+              debugPrint('SharingListener: getMediaStream error: $err');
             },
           );
 
-      // For sharing images coming from outside the app while the app is closed
-      ReceiveSharingIntent.instance.getInitialMedia().then((
-        List<SharedMediaFile> value,
-      ) {
-        if (mounted) {
-          _handleSharedFiles(value);
-        }
-      });
+      // For sharing files coming from outside the app while the app is closed
+      ReceiveSharingIntent.instance
+          .getInitialMedia()
+          .then((files) {
+            _launchedWithShare = files.isNotEmpty;
+            _onSharedFiles(files);
+            // Mark the launch intent as consumed so it is never reported again.
+            ReceiveSharingIntent.instance.reset();
+          })
+          .catchError((Object e) {
+            debugPrint('SharingListener: getInitialMedia error: $e');
+          })
+          .whenComplete(() {
+            _initialShareChecked = true;
+            _maybeRequestLaunchPermissions();
+          });
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeRequestLaunchPermissions();
+    });
   }
 
   @override
@@ -73,59 +88,113 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
     super.dispose();
   }
 
-  Future<void> _handleSharedFiles(List<SharedMediaFile> files) async {
-    if (files.isEmpty) return;
+  bool get _isLocked =>
+      ref.read(appLockEnabledProvider) && !ref.read(isAppUnlockedProvider);
 
-    // Filter for valid files (Image/PDF)
+  /// Launch-time permission prompts are deferred until the app is unlocked and
+  /// no share is being handled. A permission dialog pauses the activity, which
+  /// cancels an in-progress biometric prompt and competes with share dialogs.
+  /// When the app was opened through a share we skip them for this session.
+  void _maybeRequestLaunchPermissions() {
+    if (!mounted || _launchPermissionsRequested) return;
+    if (!_initialShareChecked || _launchedWithShare || _isLocked) return;
+    _launchPermissionsRequested = true;
+    _shareQueue = _shareQueue.then((_) async {
+      if (mounted) await PermissionUtils.requestLaunchPermissions();
+    });
+  }
+
+  void _onSharedFiles(List<SharedMediaFile> files) {
+    if (!mounted) return;
     final validFiles = files.where((f) => f.path.isNotEmpty).toList();
     if (validFiles.isEmpty) return;
 
+    final signature = (validFiles.map((f) => f.path).toList()..sort()).join('|');
+    final now = DateTime.now();
+    if (signature == _lastShareSignature &&
+        _lastShareAt != null &&
+        now.difference(_lastShareAt!) < _duplicateShareWindow) {
+      debugPrint('SharingListener: Ignoring duplicate delivery of the same share.');
+      return;
+    }
+    _lastShareSignature = signature;
+    _lastShareAt = now;
+
     // If app lock is enabled and session is currently locked, queue files for post-unlock
-    final isLockEnabled = ref.read(appLockEnabledProvider);
-    final isUnlocked = ref.read(isAppUnlockedProvider);
-    if (isLockEnabled && !isUnlocked) {
-      debugPrint('SharingListener: App is locked. Holding ${validFiles.length} shared files until unlock.');
+    if (_isLocked) {
+      debugPrint(
+        'SharingListener: App is locked. Holding ${validFiles.length} shared files until unlock.',
+      );
       _pendingSharedFiles = validFiles;
       return;
     }
 
-    // 1. Check for Active Trips
-    // We use ref.read(tripListProvider.future) to ensure we get the latest data
-    final trips = await ref.read(tripListProvider.future);
+    _enqueueShare(validFiles);
+  }
 
-    final activeTrips = trips.where((t) => t.status == 'Active').toList();
+  void _enqueueShare(List<SharedMediaFile> files) {
+    _shareQueue = _shareQueue.then((_) => _handleSharedFiles(files));
+  }
 
-    if (activeTrips.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No active trips found to add expense to.'),
-          ),
-        );
+  Future<void> _handleSharedFiles(List<SharedMediaFile> files) async {
+    if (!mounted) return;
+    try {
+      // 1. Check for Active Trips
+      final trips = await _loadTrips();
+      final activeTrips = trips.where((t) => t.status == 'Active').toList();
+
+      if (activeTrips.isEmpty) {
+        _showSnackBar('No active trips found to add expense to.');
+        return;
       }
-      return;
-    }
 
-    Trip? selectedTrip;
-
-    if (activeTrips.length == 1) {
-      selectedTrip = activeTrips.first;
-    } else {
-      if (mounted) {
+      Trip? selectedTrip;
+      if (activeTrips.length == 1) {
+        selectedTrip = activeTrips.first;
+      } else if (mounted) {
         selectedTrip = await _showTripSelectionDialog(activeTrips);
       }
+
+      if (selectedTrip == null) return; // User cancelled
+
+      // Copy shared files to persistent storage so they survive app updates.
+      // PDFs are always stored with a .pdf extension, even if shared without one.
+      final persistentPaths = await ImageUtils.copyToBillsDir(
+        files.map((f) => f.path).toList(),
+      );
+
+      if (mounted) {
+        await _showAddExpenseOptionsFromShare(selectedTrip, persistentPaths);
+      }
+    } catch (e, st) {
+      debugPrint('SharingListener: Failed to handle shared files: $e\n$st');
+      _showSnackBar(
+        'Could not open the shared file. Please try sharing it again.',
+        isError: true,
+      );
     }
+  }
 
-    if (selectedTrip == null) return; // User cancelled
+  /// Reads trips, retrying once with a fresh load if the provider is in an
+  /// error state (e.g. the database failed to open during cold start).
+  Future<List<Trip>> _loadTrips() async {
+    try {
+      return await ref.read(tripListProvider.future);
+    } catch (e) {
+      debugPrint('SharingListener: Trip load failed ($e). Retrying once.');
+      ref.invalidate(tripListProvider);
+      return await ref.read(tripListProvider.future);
+    }
+  }
 
-    // Copy shared files to persistent storage so they survive app updates
-    final persistentPaths = await ImageUtils.copyToBillsDir(
-      validFiles.map((f) => f.path).toList(),
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.orange : null,
+      ),
     );
-
-    if (mounted) {
-      _showAddExpenseOptionsFromShare(selectedTrip, persistentPaths);
-    }
   }
 
   Future<Trip?> _showTripSelectionDialog(List<Trip> trips) async {
@@ -163,92 +232,52 @@ class _SharingListenerState extends ConsumerState<SharingListener> {
     );
   }
 
-  void _showAddExpenseOptionsFromShare(Trip trip, List<String> filePaths) {
-    showDialog(
+  Future<void> _showAddExpenseOptionsFromShare(
+    Trip trip,
+    List<String> filePaths,
+  ) {
+    return showDialog(
       context: context,
       barrierColor: Colors.black87,
       builder: (ctx) => AddExpenseOptionsDialog(
         heads: ExpenseConstants.heads,
-        onOptionSelected: (head, subHead, isAiScan) async {
-          if (isAiScan) {
-            await _navigateToExpenseFormWithAiScan(trip, filePaths);
-          } else {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => ExpenseFormScreen(
-                  tripId: trip.id!,
-                  initialData: {
-                    'billPaths': filePaths,
-                    'head': head,
-                    'subHead': subHead,
-                  },
-                ),
+        onOptionSelected: (head, subHead, isAiScan) {
+          if (!mounted) return;
+          // For AI scan the form converts PDFs to page images itself, behind its
+          // progress indicator, so the screen opens immediately.
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => ExpenseFormScreen(
+                tripId: trip.id!,
+                initialData: isAiScan
+                    ? {'billPaths': filePaths, 'autoAnalyze': true}
+                    : {
+                        'billPaths': filePaths,
+                        'head': head,
+                        'subHead': subHead,
+                      },
               ),
-            );
-          }
+            ),
+          );
         },
       ),
     );
   }
 
-  /// Converts shared PDFs to images and navigates to expense form with AI analysis.
-  /// Ensures parity with Add Expense button flow where PDFs are converted before AI.
-  Future<void> _navigateToExpenseFormWithAiScan(
-    Trip trip,
-    List<String> filePaths,
-  ) async {
-    // Convert PDFs to images so Gemini can analyze (same as Add Expense + PDF flow)
-    final pathsForAi = await ImageUtils.convertPdfPathsToImages(filePaths);
-    if (pathsForAi.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No valid images to analyze.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-      return;
-    }
-    if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => ExpenseFormScreen(
-          tripId: trip.id!,
-          initialData: {
-            'billPaths': pathsForAi,
-            'autoAnalyze': true,
-          },
-        ),
-      ),
-    );
-  }
-
-  void _requestLaunchPermissions() {
-    if (_launchPermissionsRequested) return;
-    _launchPermissionsRequested = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      PermissionUtils.requestLaunchPermissions();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    _requestLaunchPermissions();
-
     // Listen for biometric unlock: if there are pending shared files, process them immediately
     ref.listen<bool>(isAppUnlockedProvider, (previous, isUnlocked) {
-      if (isUnlocked &&
-          _pendingSharedFiles != null &&
-          _pendingSharedFiles!.isNotEmpty) {
-        final filesToProcess = List<SharedMediaFile>.from(_pendingSharedFiles!);
-        _pendingSharedFiles = null;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            _handleSharedFiles(filesToProcess);
-          }
-        });
-      }
+      if (!isUnlocked) return;
+      final pending = _pendingSharedFiles;
+      _pendingSharedFiles = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (pending != null && pending.isNotEmpty) {
+          _enqueueShare(pending);
+        }
+        _maybeRequestLaunchPermissions();
+      });
     });
 
     return widget.child;

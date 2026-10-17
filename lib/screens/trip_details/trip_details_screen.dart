@@ -1614,10 +1614,11 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     final selectedModel = modelAsync.value;
 
     final geminiService = GeminiService();
-    // Send first 2 pages (e.g. PDF) so from/to can be read from itinerary
+    // All pages are sent (the service caps at 6) so multi-page tickets and
+    // folios are read the same way every time.
     final result = await geminiService.analyzeBill(
       apiKey: apiKey,
-      imagePaths: selectedPaths.take(2).toList(),
+      imagePaths: selectedPaths,
       availableHeads: ExpenseConstants.heads,
       availableSubHeads: ExpenseConstants.subHeads,
       tripLocations: _trip.cities,
@@ -1627,13 +1628,16 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     if (!context.mounted) return;
     Navigator.pop(context); // Close loading dialog
 
-    // Add image paths and built notes to result so it can be shown in form
-    final initialData = result != null
-        ? Map<String, dynamic>.from(result)
-        : <String, dynamic>{};
-    initialData['billPaths'] = selectedPaths;
-    initialData['notes'] =
-        GeminiService.buildNotesFromExtractedFields(initialData);
+    // The form applies the cleaned-up result and builds the remark itself,
+    // exactly as it does for files shared into the app.
+    final initialData = <String, dynamic>{
+      'billPaths': selectedPaths,
+      if (result != null)
+        'aiResult': GeminiService.normalizeResult(
+          result,
+          tripCities: _trip.cities,
+        ),
+    };
 
     if (!context.mounted) return;
     Navigator.push(

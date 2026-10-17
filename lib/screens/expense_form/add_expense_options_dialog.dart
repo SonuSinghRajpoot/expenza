@@ -36,6 +36,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
       data: (key) => key != null,
       orElse: () => false,
     );
+    final isCheckingKey = activeKeyAsync.isLoading && !activeKeyAsync.hasValue;
     final showAiScan = isOnline && hasValidGeminiKey;
     
     final subHeads = _selectedHead != null 
@@ -66,15 +67,25 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
             ),
             const Gap(24),
 
-            // AI Scan Option - only show if online and has valid Gemini key
-            if (showAiScan) ...[
+            // AI Scan Option - only show if online and has valid Gemini key.
+            // While the key is still loading (cold start), reserve the same slot
+            // with a disabled placeholder so the buttons below don't jump.
+            if (showAiScan || (isOnline && isCheckingKey)) ...[
               _buildOptionButton(
                 context: context,
                 icon: Icons.auto_awesome_outlined,
                 label: 'AI-Scan Receipt',
-                subtitle: 'Auto-fill form using Gemini AI',
+                subtitle: showAiScan
+                    ? 'Auto-fill form using Gemini AI'
+                    : 'Checking Gemini key…',
                 color: Theme.of(context).colorScheme.primary,
-                isEnabled: true,
+                isEnabled: showAiScan,
+                trailing: showAiScan
+                    ? null
+                    : const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                 onTap: () {
                   Navigator.pop(context);
                   widget.onOptionSelected(null, null, true);
@@ -98,7 +109,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
                 ],
               ),
               const Gap(16),
-            ] else if (!hasValidGeminiKey && isOnline) ...[
+            ] else if (!hasValidGeminiKey && isOnline && !isCheckingKey) ...[
               // Show info message when online but no Gemini key
               Container(
                 padding: const EdgeInsets.all(20),
@@ -246,6 +257,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
     required Color color,
     required VoidCallback onTap,
     bool isEnabled = true,
+    Widget? trailing,
   }) {
     return InkWell(
       onTap: isEnabled ? onTap : null,
@@ -296,7 +308,7 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
                 ],
               ),
             ),
-            Icon(
+            trailing ?? Icon(
               isEnabled ? Icons.chevron_right_rounded : Icons.cloud_off_rounded,
               color: isEnabled ? color : AppDesign.textTertiaryOf(context),
             ),

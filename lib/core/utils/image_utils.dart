@@ -122,12 +122,19 @@ class ImageUtils {
       }
       
       // File is not in persistent storage; read bytes and (when possible) re-encode to high-quality JPEG
-      final ext = p.extension(normalized).toLowerCase();
+      var ext = p.extension(normalized).toLowerCase();
       final rawBytes = await f.readAsBytes();
       if (rawBytes.isEmpty) return sourcePath;
 
+      // Shared PDFs often arrive without a .pdf extension (WhatsApp, Gmail).
+      // Detect by content so the copy is always named *.pdf, which the rest of
+      // the app relies on to treat it as a PDF.
+      if (_hasPdfSignature(rawBytes)) {
+        ext = '.pdf';
+      }
+
       // Try to decode using the `image` package (supports many formats like PNG/JPEG/WebP).
-      final decoded = img.decodeImage(rawBytes);
+      final decoded = ext == '.pdf' ? null : img.decodeImage(rawBytes);
       if (decoded != null) {
         img.Image processed = decoded;
         if (decoded.width > 1800 || decoded.height > 1800) {
@@ -293,6 +300,40 @@ class ImageUtils {
     return [];
   }
 
+  /// True when [bytes] start with the PDF magic number `%PDF-`.
+  static bool _hasPdfSignature(List<int> bytes) {
+    const signature = [0x25, 0x50, 0x44, 0x46, 0x2D]; // %PDF-
+    if (bytes.length < signature.length) return false;
+    for (var i = 0; i < signature.length; i++) {
+      if (bytes[i] != signature[i]) return false;
+    }
+    return true;
+  }
+
+  /// Returns true if the file at [path] is a PDF, judged by its extension or,
+  /// when the extension is missing or misleading, by its content.
+  static Future<bool> isPdfFile(String path) async {
+    if (path.toLowerCase().endsWith('.pdf')) return true;
+    if (kIsWeb) return false;
+    RandomAccessFile? raf;
+    try {
+      final file = File(_normalizeLocalPath(path));
+      if (!await file.exists()) return false;
+      raf = await file.open();
+      final header = await raf.read(5);
+      return _hasPdfSignature(header);
+    } catch (_) {
+      return false;
+    } finally {
+      await raf?.close();
+    }
+  }
+
+  /// Page images rendered from a PDF by the native renderer are named
+  /// `pdf_page_<uuid>_<n>.jpg` (see MainActivity.renderPdfFile).
+  static bool isRenderedPdfPage(String path) =>
+      p.basename(path).startsWith('pdf_page_');
+
   /// Converts a list of paths to image paths. PDFs are converted to JPG images;
   /// image paths are returned as-is. Use before sending to AI analysis (Gemini).
   static Future<List<String>> convertPdfPathsToImages(List<String> paths) async {
@@ -300,8 +341,7 @@ class ImageUtils {
     final List<String> out = [];
     for (final path in paths) {
       if (path.isEmpty) continue;
-      final lower = path.toLowerCase();
-      if (lower.endsWith('.pdf')) {
+      if (await isPdfFile(path)) {
         final images = await convertPdfToImages(path);
         out.addAll(images);
       } else {

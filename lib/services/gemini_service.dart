@@ -1,20 +1,38 @@
 import 'dart:convert';
 
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart' as gai;
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 import '../core/constants/expense_constants.dart';
+import '../core/utils/image_utils.dart';
+import '../core/utils/indian_city_resolver.dart';
 import '../core/utils/ocr_service.dart';
 import '../data/repositories/gemini_repository.dart';
 
 class GeminiService {
+  static const String _cityRules =
+      'CITY RULES: fromCity/toCity must be an Indian CITY name only (e.g. "Mumbai", "Bengaluru", "Delhi"). '
+      'Never return an airport, terminal, railway station, bus stand, area, street, hotel name or PIN code. '
+      'For flights use the city the airport serves; for trains the city of the station. '
+      'fromCode/toCode: the IATA airport code or Indian Railways station code printed for that city, else null. '
+      'For non-travel bills, fromCity is the city where the expense happened and toCity is null. '
+      'If the city is not clearly printed, use null.';
+
   static String _buildLocationBlock(List<String>? tripLocations) {
-    if (tripLocations != null && tripLocations.isNotEmpty) {
-      return 'Trip locations (prefer for fromCity/toCity): ${tripLocations.join(', ')}. Match when confident; else use receipt. toCity only for travel.';
+    // Only recognised cities are offered as hints, so an earlier bad value
+    // saved on the trip is never fed back to the model.
+    final validTripCities = <String>{};
+    for (final c in tripLocations ?? const <String>[]) {
+      final name = IndianCityResolver.canonicalName(c);
+      if (name != null) validTripCities.add(name);
     }
-    return 'fromCity/toCity from receipt. toCity=null for non-travel.';
+    final hint = validTripCities.isEmpty
+        ? ''
+        : ' Trip cities: ${validTripCities.join(', ')}. If the document refers to one of these, use exactly that spelling.';
+    return '$_cityRules$hint';
   }
 
   static String _buildSubHeadsBlock(Map<String, List<String>> m) {
@@ -31,7 +49,7 @@ class GeminiService {
     final multiPageHint = imageCount > 1
         ? ' Document spans $imageCount pages/images: itinerary, hotel folios, check-in/out and grand totals may appear on any page.'
         : '';
-    return 'Extract from this receipt/document into JSON: head (one of $availableHeads), subHead (MANDATORY: one of SubHeads for the chosen head), amount, date (YYYY-MM-DD), endDate, fromCity, toCity (null if non-travel), pax (number of people; null if not applicable). Do NOT extract notes. $loc\n'
+    return 'Extract from this receipt/document into JSON: head (one of $availableHeads), subHead (MANDATORY: one of SubHeads for the chosen head), amount, date (YYYY-MM-DD), endDate, fromCity, fromCode, toCity, toCode (null if non-travel), pax (number of people; null if not applicable). Do NOT extract notes. $loc\n'
         'SubHeads: $subHeadsBlock\n\n'
         'CRITICAL AMOUNT & DEDUCTION RULES:\n'
         '1. Search for all price figures: Base Fare / Item price, Subtotal, Taxes/GST, Ancillary fees (Convenience fee, Seat selection, Meal add-on, Baggage fee, Service charge), Gross Amount, Discounts, Coupons, Promo Codes, and Amount Paid.\n'
@@ -54,7 +72,7 @@ class GeminiService {
     String loc,
   ) {
     final subHeadsBlock = _buildSubHeadsBlock(availableSubHeads);
-    return 'Extract from this receipt text into JSON: head (one of $availableHeads), subHead (MANDATORY: one of SubHeads for the chosen head), amount, date (YYYY-MM-DD), endDate, fromCity, toCity (null if non-travel), pax (number of people; null if not applicable). Do NOT extract notes. $loc\n'
+    return 'Extract from this receipt text into JSON: head (one of $availableHeads), subHead (MANDATORY: one of SubHeads for the chosen head), amount, date (YYYY-MM-DD), endDate, fromCity, fromCode, toCity, toCode (null if non-travel), pax (number of people; null if not applicable). Do NOT extract notes. $loc\n'
         'SubHeads: $subHeadsBlock\n\n'
         'CRITICAL AMOUNT & DEDUCTION RULES:\n'
         '1. Search for all price figures: Base Fare / Item price, Subtotal, Taxes/GST, Ancillary fees (Convenience fee, Seat selection, Meal add-on, Baggage fee, Service charge), Gross Amount, Discounts, Coupons, Promo Codes, and Amount Paid.\n'
@@ -102,11 +120,23 @@ class GeminiService {
           nullable: true,
         ),
         'fromCity': gai.Schema.string(
-          description: 'From location / city',
+          description:
+              'Indian city name only (origin for travel, otherwise where the expense happened). No airport/station/area names.',
+          nullable: true,
+        ),
+        'fromCode': gai.Schema.string(
+          description:
+              'IATA airport or Indian Railways station code for fromCity, if printed',
           nullable: true,
         ),
         'toCity': gai.Schema.string(
-          description: 'To city for travel; null if non-travel',
+          description:
+              'Destination Indian city name for travel only; null if non-travel',
+          nullable: true,
+        ),
+        'toCode': gai.Schema.string(
+          description:
+              'IATA airport or Indian Railways station code for toCity, if printed',
           nullable: true,
         ),
         'pax': gai.Schema.integer(
@@ -118,53 +148,103 @@ class GeminiService {
     );
   }
 
-  /// Builds notes from extracted fields instead of from receipt text.
-  /// Examples: "{fromCity} to {toCity} flight ticket for {pax} person",
-  /// "Accommodation for {pax} person", "Event Fee", "Stationary".
-  static String buildNotesFromExtractedFields(Map<String, dynamic> data) {
-    final head = data['head']?.toString();
-    final subHead = data['subHead']?.toString();
-    final fromCity = data['fromCity']?.toString();
-    final toCity = data['toCity']?.toString();
-    final pax = data['pax'];
-    final paxNum = pax is int
-        ? pax
-        : (pax != null ? int.tryParse(pax.toString()) : null);
-    final paxStr = paxNum != null
-        ? (paxNum == 1 ? '1 person' : '$paxNum persons')
+  /// Turns a raw Gemini response into values the app can trust:
+  /// - head/subHead only from the allowed lists, and subHead only if it
+  ///   belongs to the head (otherwise null, so the user picks it)
+  /// - cities resolved to canonical Indian city names, or null. The raw text of
+  ///   an unrecognised city is kept in `rawFromCity` / `rawToCity` for hints.
+  /// - toCity only for Travel
+  /// - amount as a positive number, dates as valid YYYY-MM-DD, pax as int >= 1
+  static Map<String, dynamic> normalizeResult(
+    Map<String, dynamic> raw, {
+    List<String> tripCities = const [],
+  }) {
+    String? str(dynamic v) {
+      final t = v?.toString().trim();
+      return (t == null || t.isEmpty || t.toLowerCase() == 'null') ? null : t;
+    }
+
+    final rawHead = str(raw['head']);
+    final head = rawHead == null
+        ? null
+        : ExpenseConstants.heads
+              .where((h) => h.toLowerCase() == rawHead.toLowerCase())
+              .firstOrNull;
+
+    final rawSubHead = str(raw['subHead']);
+    final subHead = (head == null || rawSubHead == null)
+        ? null
+        : (ExpenseConstants.subHeads[head] ?? const <String>[])
+              .where((s) => s.toLowerCase() == rawSubHead.toLowerCase())
+              .firstOrNull;
+
+    final amountValue = raw['amount'];
+    final amount = amountValue is num
+        ? amountValue.toDouble()
+        : double.tryParse(str(amountValue)?.replaceAll(',', '') ?? '');
+
+    String? isoDate(dynamic v) {
+      final t = str(v);
+      if (t == null || !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(t)) return null;
+      final parsed = DateTime.tryParse(t);
+      if (parsed == null) return null;
+      // Reject rolled-over dates such as 2026-02-30.
+      final roundTrip =
+          '${parsed.year.toString().padLeft(4, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}';
+      return roundTrip == t ? t : null;
+    }
+
+    final paxValue = raw['pax'];
+    final pax = paxValue is num
+        ? paxValue.toInt()
+        : int.tryParse(str(paxValue) ?? '');
+
+    final isTravel = head == 'Travel';
+    final rawFrom = str(raw['fromCity']);
+    final rawTo = isTravel ? str(raw['toCity']) : null;
+    final fromCity = IndianCityResolver.canonicalName(
+      rawFrom,
+      code: str(raw['fromCode']),
+      preferred: tripCities,
+    );
+    final toCity = isTravel
+        ? IndianCityResolver.canonicalName(
+            rawTo,
+            code: str(raw['toCode']),
+            preferred: tripCities,
+          )
         : null;
 
-    if (head == null) return '';
+    return {
+      'head': head,
+      'subHead': subHead,
+      'amount': (amount != null && amount > 0) ? amount : null,
+      'date': isoDate(raw['date']),
+      'endDate': isoDate(raw['endDate']),
+      'fromCity': fromCity,
+      'toCity': toCity,
+      'rawFromCity': fromCity == null ? rawFrom : null,
+      'rawToCity': (isTravel && toCity == null) ? rawTo : null,
+      'pax': (pax != null && pax >= 1) ? pax : null,
+    };
+  }
 
-    switch (head) {
-      case 'Travel':
-        if (fromCity != null && toCity != null && subHead != null) {
-          final subLower = subHead.toLowerCase();
-          if (subLower == 'flight') {
-            return paxStr != null
-                ? '$fromCity to $toCity flight ticket for $paxStr'
-                : '$fromCity to $toCity flight ticket';
-          }
-          return paxStr != null
-              ? '$fromCity to $toCity $subHead for $paxStr'
-              : '$fromCity to $toCity $subHead';
-        }
-        return subHead ?? 'Travel';
-      case 'Accommodation':
-        return paxStr != null
-            ? '${subHead ?? 'Accommodation'} for $paxStr'
-            : (subHead ?? 'Accommodation');
-      case 'Event':
-        return subHead ?? 'Event';
-      case 'Miscellaneous':
-        return subHead ?? 'Miscellaneous';
-      case 'Food':
-        return paxStr != null
-            ? '${subHead ?? 'Meal'} for $paxStr'
-            : (subHead ?? 'Meal');
-      default:
-        return subHead ?? head;
-    }
+  /// Gemini 3 models are tuned for the default temperature (1.0) and Google
+  /// advises against lowering it. For older models use greedy decoding so the
+  /// same document gives the same answer. Either way, [normalizeResult] makes
+  /// the values the app uses deterministic.
+  static gai.GenerationConfig _generationConfig(
+    String model,
+    List<String> availableHeads,
+  ) {
+    final isGemini3 = model.toLowerCase().startsWith('gemini-3');
+    return gai.GenerationConfig(
+      candidateCount: 1,
+      temperature: isGemini3 ? null : 0.0,
+      topK: isGemini3 ? null : 1,
+      responseMimeType: 'application/json',
+      responseSchema: _buildResponseSchema(availableHeads),
+    );
   }
 
   static Map<String, dynamic>? _parseJsonResponse(String? raw) {
@@ -203,10 +283,7 @@ class GeminiService {
       final model = gai.GenerativeModel(
         model: selectedModel,
         apiKey: apiKey,
-        generationConfig: gai.GenerationConfig(
-          responseMimeType: 'application/json',
-          responseSchema: _buildResponseSchema(availableHeads),
-        ),
+        generationConfig: _generationConfig(selectedModel, availableHeads),
       );
 
       final prompt = _buildTextPrompt(
@@ -247,10 +324,7 @@ class GeminiService {
       final model = gai.GenerativeModel(
         model: selectedModel,
         apiKey: apiKey,
-        generationConfig: gai.GenerationConfig(
-          responseMimeType: 'application/json',
-          responseSchema: _buildResponseSchema(availableHeads),
-        ),
+        generationConfig: _generationConfig(selectedModel, availableHeads),
       );
       // Support multi-page hotel folios and itinerary tickets up to 6 pages
       final toSend = imagePaths.take(6).toList();
@@ -299,8 +373,12 @@ class GeminiService {
   }) async {
     if (imagePaths.isEmpty) return null;
 
-    // Smart Hybrid Pipeline: Try fast on-device OCR first for single printed receipts
-    if (imagePaths.length == 1 && !kIsWeb) {
+    // Smart Hybrid Pipeline: Try fast on-device OCR first for a single photo of a
+    // printed receipt. Pages rendered from a PDF always use Vision, because
+    // tickets and invoices need the layout to tell origin from destination.
+    if (imagePaths.length == 1 &&
+        !kIsWeb &&
+        !ImageUtils.isRenderedPdfPage(imagePaths.first)) {
       try {
         final ocrText = await OcrService.extractTextFromImagePath(imagePaths.first);
         if (ocrText != null && OcrService.isOcrSufficient(ocrText)) {
@@ -313,7 +391,12 @@ class GeminiService {
             tripLocations,
             modelName: modelName,
           );
-          if (result != null && result['amount'] != null) {
+          // Accept the text result only when the core fields are present;
+          // otherwise use Vision so a partial answer is never returned.
+          if (result != null &&
+              result['amount'] != null &&
+              result['date'] != null &&
+              result['head'] != null) {
             return result;
           }
           debugPrint('GeminiService: Text analysis incomplete, falling back to Vision');

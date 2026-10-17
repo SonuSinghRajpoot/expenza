@@ -27,6 +27,9 @@ final tripListProvider = AsyncNotifierProvider<TripListNotifier, List<Trip>>(
   },
 );
 
+/// Mutations keep the current list visible until the new one is loaded,
+/// instead of switching to a loading state. Readers that use the current value
+/// (the expense form, the share flow) never see an empty list mid-update.
 class TripListNotifier extends AsyncNotifier<List<Trip>> {
   @override
   Future<List<Trip>> build() async {
@@ -35,7 +38,6 @@ class TripListNotifier extends AsyncNotifier<List<Trip>> {
   }
 
   Future<void> addTrip(Trip trip) async {
-    state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final repository = ref.read(tripRepositoryProvider);
       await repository.createTrip(trip);
@@ -44,7 +46,6 @@ class TripListNotifier extends AsyncNotifier<List<Trip>> {
   }
 
   Future<void> deleteTrip(int tripId) async {
-    state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final repository = ref.read(tripRepositoryProvider);
       await repository.deleteTrip(tripId);
@@ -53,7 +54,6 @@ class TripListNotifier extends AsyncNotifier<List<Trip>> {
   }
 
   Future<void> archiveTrip(int tripId) async {
-    state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final repository = ref.read(tripRepositoryProvider);
       await repository.archiveTrip(tripId);
@@ -62,7 +62,6 @@ class TripListNotifier extends AsyncNotifier<List<Trip>> {
   }
 
   Future<void> submitTrip(int tripId) async {
-    state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final repository = ref.read(tripRepositoryProvider);
       await repository.submitTrip(tripId);
@@ -71,7 +70,6 @@ class TripListNotifier extends AsyncNotifier<List<Trip>> {
   }
 
   Future<void> reopenTrip(int tripId) async {
-    state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final repository = ref.read(tripRepositoryProvider);
       await repository.reopenTrip(tripId);
@@ -80,7 +78,6 @@ class TripListNotifier extends AsyncNotifier<List<Trip>> {
   }
 
   Future<void> updateTrip(Trip trip) async {
-    state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final repository = ref.read(tripRepositoryProvider);
       await repository.updateTrip(trip);
@@ -89,7 +86,6 @@ class TripListNotifier extends AsyncNotifier<List<Trip>> {
   }
 
   Future<void> updateTripStatus(int tripId, String status) async {
-    state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       final repository = ref.read(tripRepositoryProvider);
       await repository.updateTripStatus(tripId, status);

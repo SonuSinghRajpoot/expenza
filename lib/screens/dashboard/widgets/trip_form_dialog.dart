@@ -6,6 +6,7 @@ import '../../../models/trip.dart';
 import '../../../providers/trip_provider.dart';
 import '../../../core/theme/app_design.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/indian_city_resolver.dart';
 
 class TripFormDialog extends ConsumerStatefulWidget {
   final Trip? trip;
@@ -120,8 +121,13 @@ class _TripFormDialogState extends ConsumerState<TripFormDialog> {
   }
 
   void _addCity(String city) {
-    final trimmed = city.trim();
-    if (trimmed.isNotEmpty && !_selectedCities.contains(trimmed)) {
+    // Recognised cities are stored in their canonical spelling
+    // ("Bangalore" -> "Bengaluru") so the trip never holds two spellings.
+    final trimmed = IndianCityResolver.canonicalName(city) ?? city.trim();
+    final exists = _selectedCities.any(
+      (c) => c.toLowerCase() == trimmed.toLowerCase(),
+    );
+    if (trimmed.isNotEmpty && !exists) {
       setState(() {
         _selectedCities.add(trimmed);
         _citySearchController.clear();

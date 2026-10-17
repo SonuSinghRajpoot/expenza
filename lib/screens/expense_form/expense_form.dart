@@ -18,6 +18,8 @@ import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/services/error_handler.dart';
 import '../../core/utils/permission_utils.dart';
+import '../../core/utils/indian_city_resolver.dart';
+import '../../core/utils/remark_builder.dart';
 import 'widgets/image_viewer_dialog.dart';
 
 class ExpenseFormScreen extends ConsumerStatefulWidget {
@@ -56,6 +58,20 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
   DateTime _endDate = DateTime.now();
   List<String> _billPaths = []; // Multiple bill images/pages
 
+  /// While true, the notes field shows the remark generated from the current
+  /// field values and updates as they change. It turns false as soon as the
+  /// user types their own notes.
+  bool _remarkIsAuto = true;
+  String? _lastAutoRemark;
+
+  /// Text the AI read for a city that is not a recognised Indian city. Shown
+  /// as a hint under the empty field so the user can pick the right city.
+  String? _fromCityHint;
+  String? _toCityHint;
+
+  /// Unrecognised city names the user explicitly confirmed on save.
+  final Set<String> _confirmedUnknownCities = {};
+
   bool get _showPaxField =>
       _selectedHead == 'Accommodation' ||
       _selectedHead == 'Travel' ||
@@ -74,8 +90,6 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
       amountText = widget.expense!.amount.toString();
       cityText = widget.expense!.city;
       toCityText = widget.expense!.toCity ?? '';
-      cityText = widget.expense!.city;
-      toCityText = widget.expense!.toCity ?? '';
       notesText = widget.expense!.notes ?? '';
       paxText = widget.expense!.pax?.toString() ?? '1';
       _selectedHead = widget.expense!.head;
@@ -85,43 +99,17 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
       _billPaths = List<String>.from(widget.expense!.billPaths);
     } else if (widget.initialData != null) {
       final data = widget.initialData!;
-      amountText = data['amount']?.toString() ?? '';
-      cityText = data['fromCity'] ?? data['city'] ?? '';
-      toCityText = data['toCity'] ?? cityText;
-      notesText = data['notes'] ?? '';
 
-      // Normalize Category mapping from AI
-      final aiHead = data['head']?.toString();
-      if (aiHead != null) {
-        final matchedHead = ExpenseConstants.heads.firstWhere(
-          (h) => h.toLowerCase() == aiHead.toLowerCase(),
-          orElse: () => _selectedHead,
-        );
-        _selectedHead = matchedHead;
+      // Manual entry from the share flow: head / sub-head picked by the user.
+      final head = data['head']?.toString();
+      if (head != null && ExpenseConstants.heads.contains(head)) {
+        _selectedHead = head;
+        final subHead = data['subHead']?.toString();
+        if ((ExpenseConstants.subHeads[head] ?? const []).contains(subHead)) {
+          _selectedSubHead = subHead;
+        }
       }
 
-      // Normalize Sub-category mapping from AI
-      final aiSubHead = data['subHead']?.toString();
-      if (aiSubHead != null) {
-        final subs = ExpenseConstants.subHeads[_selectedHead] ?? [];
-        final matchedSub = subs
-            .where((s) => s.toLowerCase() == aiSubHead.toLowerCase())
-            .firstOrNull;
-        _selectedSubHead = matchedSub;
-      }
-
-      if (data['date'] != null) {
-        try {
-          _startDate = DateTime.parse(data['date']);
-          _endDate = _startDate; // Default matches start
-        } catch (_) {}
-      }
-      if (data['endDate'] != null) {
-        try {
-          _endDate = DateTime.parse(data['endDate']);
-        } catch (_) {}
-      }
-      // Note: Dates from initialData will be clamped in post-frame callback
       if (data['billPaths'] != null) {
         _billPaths = List<String>.from(data['billPaths']);
       } else if (data['billPath'] != null) {
@@ -140,29 +128,140 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
     _notesController = TextEditingController(text: notesText);
     _paxController = TextEditingController(text: paxText);
 
+    // AI result already analysed before opening the form (trip details flow).
+    // Dates from it are clamped to the trip range in the post-frame callback.
+    final aiResult = widget.initialData?['aiResult'];
+    if (widget.expense == null && aiResult is Map<String, dynamic>) {
+      _applyAiResult(aiResult);
+    }
+
+    // Existing notes stay as written unless they are empty or exactly the
+    // remark the current fields would generate.
+    _remarkIsAuto = notesText.trim().isEmpty || notesText == _buildRemark();
+    _refreshRemark();
+    _notesController.addListener(_onNotesChanged);
+    _cityController.addListener(_onRemarkInputChanged);
+    _toCityController.addListener(_onRemarkInputChanged);
+    _paxController.addListener(_onRemarkInputChanged);
+
     // Ensure default dates are within trip date range
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final tripsAsync = ref.read(tripListProvider);
-      tripsAsync.whenData((trips) {
-        final trip = trips.where((t) => t.id == widget.tripId).firstOrNull;
-        if (trip != null && widget.expense == null) {
-          // Clamp dates to trip range (for both new expenses and initialData)
-          setState(() {
-            _startDate = _clampDateToTripRange(_startDate, trip);
-            _endDate = _clampDateToTripRange(_endDate, trip);
-            // Ensure end date is not before start date
-            if (_endDate.isBefore(_startDate)) {
-              _endDate = _startDate;
-            }
-          });
-        }
-      });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final trip = await _loadTrip();
+      if (!mounted) return;
+      if (trip != null && widget.expense == null) {
+        // Clamp dates to trip range (for both new expenses and initialData)
+        setState(() {
+          _startDate = _clampDateToTripRange(_startDate, trip);
+          _endDate = _clampDateToTripRange(_endDate, trip);
+          // Ensure end date is not before start date
+          if (_endDate.isBefore(_startDate)) {
+            _endDate = _startDate;
+          }
+        });
+      }
 
       // Check for auto-analyze from sharing
       if (widget.initialData?['autoAnalyze'] == true && _billPaths.isNotEmpty) {
         _analyzeSharedFiles();
       }
     });
+  }
+
+  /// Loads this expense's trip, waiting for the trip list if it is still
+  /// loading (e.g. right after a cold start from a share).
+  Future<Trip?> _loadTrip() async {
+    try {
+      final trips = await ref.read(tripListProvider.future);
+      return trips.firstWhereOrNull((t) => t.id == widget.tripId);
+    } catch (e) {
+      debugPrint('ExpenseForm: could not load trip: $e');
+      return null;
+    }
+  }
+
+  /// Applies a result from [GeminiService.normalizeResult] to the form.
+  /// Callers wrap this in setState when the form is already built.
+  void _applyAiResult(Map<String, dynamic> result, {Trip? trip}) {
+    final amount = result['amount'];
+    if (amount is num) {
+      _amountController.text = amount == amount.roundToDouble()
+          ? amount.toInt().toString()
+          : amount.toString();
+    }
+
+    final date = DateTime.tryParse(result['date']?.toString() ?? '');
+    if (date != null) {
+      _startDate = trip != null ? _clampDateToTripRange(date, trip) : date;
+      _endDate = _startDate;
+    }
+    final endDate = DateTime.tryParse(result['endDate']?.toString() ?? '');
+    if (endDate != null) {
+      _endDate = trip != null ? _clampDateToTripRange(endDate, trip) : endDate;
+      if (_endDate.isBefore(_startDate)) _endDate = _startDate;
+    }
+
+    final head = result['head'] as String?;
+    if (head != null) {
+      _selectedHead = head;
+      // normalizeResult only returns a sub-head that belongs to the head.
+      _selectedSubHead = result['subHead'] as String?;
+    }
+
+    final fromCity = result['fromCity'] as String?;
+    final toCity = result['toCity'] as String?;
+    final rawToCity = result['rawToCity'] as String?;
+    _cityController.text = fromCity ?? '';
+    // As on manual entry, the destination defaults to the origin (local cab,
+    // non-travel bills). If the AI read a destination that is not a recognised
+    // city, leave it empty so the hint asks the user to pick one.
+    _toCityController.text = toCity ?? (rawToCity != null ? '' : (fromCity ?? ''));
+    _fromCityHint = result['rawFromCity'] as String?;
+    _toCityHint = rawToCity;
+
+    final pax = result['pax'];
+    if (pax is int && pax >= 1) {
+      _paxController.text = pax.toString();
+    }
+  }
+
+  void _onNotesChanged() {
+    final text = _notesController.text;
+    if (text == _lastAutoRemark) return;
+    // Any manual edit stops automatic updates; clearing the field resumes them
+    // on the next field change.
+    final isAuto = text.trim().isEmpty;
+    if (isAuto != _remarkIsAuto) {
+      setState(() => _remarkIsAuto = isAuto); // updates the helper text
+    }
+  }
+
+  void _onRemarkInputChanged() => _refreshRemark();
+
+  String _buildRemark() {
+    final isTravel = _selectedHead == 'Travel';
+    return RemarkBuilder.build(
+      head: _selectedHead,
+      subHead: _selectedSubHead,
+      fromCity: _displayCity(_cityController.text),
+      toCity: isTravel ? _displayCity(_toCityController.text) : null,
+      pax: _showPaxField ? int.tryParse(_paxController.text) : null,
+    );
+  }
+
+  /// Canonical spelling for a recognised city, otherwise the trimmed text.
+  String? _displayCity(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return null;
+    return IndianCityResolver.canonicalName(t) ?? t;
+  }
+
+  void _refreshRemark() {
+    if (!_remarkIsAuto) return;
+    final remark = _buildRemark();
+    _lastAutoRemark = remark;
+    if (_notesController.text != remark) {
+      _notesController.text = remark;
+    }
   }
 
   Future<void> _analyzeSharedFiles() async {
@@ -188,22 +287,37 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
         return;
       }
 
-      // Get trip to access cities
-      final tripsAsync = ref.read(tripListProvider);
-      final trip = tripsAsync.maybeWhen(
-        data: (trips) => trips.firstWhereOrNull((t) => t.id == widget.tripId),
-        orElse: () => null,
-      );
+      // Shared PDFs are converted to page images here, behind the loader,
+      // so the same images are used as evidence and for analysis.
+      final imagePaths = await ImageUtils.convertPdfPathsToImages(_billPaths);
+      if (imagePaths.isEmpty) {
+        if (mounted) {
+          Navigator.pop(context); // Pop loader
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No valid images to analyze.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+      if (mounted) setState(() => _billPaths = imagePaths);
+
+      // Get trip to access cities (waits if the trip list is still loading)
+      final trip = await _loadTrip();
       final tripCities = trip?.cities ?? [];
 
-      final modelAsync = ref.read(geminiModelProvider);
-      final selectedModel = modelAsync.value;
+      final selectedModel = await ref
+          .read(geminiModelProvider.future)
+          .catchError((_) => GeminiRepository.defaultModel);
 
       final geminiService = GeminiService();
-      // Send first 2 pages (e.g. PDF) so from/to can be read from itinerary
+      // All pages are sent (the service caps at 6) so multi-page tickets and
+      // folios are read the same way every time.
       final result = await geminiService.analyzeBill(
         apiKey: activeKey.apiKey,
-        imagePaths: _billPaths.take(2).toList(),
+        imagePaths: imagePaths,
         availableHeads: ExpenseConstants.heads,
         availableSubHeads: ExpenseConstants.subHeads,
         tripLocations: tripCities,
@@ -214,67 +328,12 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
         Navigator.pop(context); // Pop loader
 
         if (result != null) {
-          setState(() {
-            if (result['amount'] != null) {
-              _amountController.text = result['amount'].toString();
-            }
-            if (result['date'] != null) {
-              try {
-                final parsedDate = DateTime.parse(result['date']);
-                if (trip != null) {
-                  _startDate = _clampDateToTripRange(parsedDate, trip);
-                  _endDate = _startDate;
-                } else {
-                  _startDate = parsedDate;
-                  _endDate = _startDate;
-                }
-              } catch (_) {}
-            }
-            if (result['endDate'] != null) {
-              try {
-                final parsedEndDate = DateTime.parse(result['endDate']);
-                if (trip != null) {
-                  _endDate = _clampDateToTripRange(parsedEndDate, trip);
-                  // Ensure end date is not before start date
-                  if (_endDate.isBefore(_startDate)) {
-                    _endDate = _startDate;
-                  }
-                } else {
-                  _endDate = parsedEndDate;
-                }
-              } catch (_) {}
-            }
-            if (result['head'] != null) {
-              final matchedHead = ExpenseConstants.heads.firstWhere(
-                (h) =>
-                    h.toLowerCase() == result['head'].toString().toLowerCase(),
-                orElse: () => _selectedHead,
-              );
-              _selectedHead = matchedHead;
-            }
-            if (result['subHead'] != null) {
-              final subs = ExpenseConstants.subHeads[_selectedHead] ?? [];
-              final matchedSub = subs.firstWhereOrNull(
-                (s) =>
-                    s.toLowerCase() ==
-                    result['subHead'].toString().toLowerCase(),
-              );
-              _selectedSubHead = matchedSub;
-            }
-            if (result['fromCity'] != null) {
-              _cityController.text = result['fromCity'];
-            }
-            if (result['toCity'] != null) {
-              _toCityController.text = result['toCity'];
-            } else if (_cityController.text.isNotEmpty) {
-              _toCityController.text = _cityController.text;
-            }
-            _notesController.text =
-                GeminiService.buildNotesFromExtractedFields(result);
-            if (result['pax'] != null) {
-              _paxController.text = result['pax'].toString();
-            }
-          });
+          final normalized = GeminiService.normalizeResult(
+            result,
+            tripCities: tripCities,
+          );
+          setState(() => _applyAiResult(normalized, trip: trip));
+          _refreshRemark();
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Bill analyzed successfully!')),
@@ -295,6 +354,10 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
 
   @override
   void dispose() {
+    _notesController.removeListener(_onNotesChanged);
+    _cityController.removeListener(_onRemarkInputChanged);
+    _toCityController.removeListener(_onRemarkInputChanged);
+    _paxController.removeListener(_onRemarkInputChanged);
     _amountController.dispose();
     _cityController.dispose();
     _toCityController.dispose();
@@ -333,6 +396,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildDropdown(
+                  key: ValueKey('head_$_selectedHead'),
                   label: 'Expense Head',
                   value: _selectedHead,
                   items: ExpenseConstants.heads,
@@ -352,20 +416,29 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                         }
                       }
                     });
+                    _refreshRemark();
                   },
-                  validator: (val) =>
-                      val == null || val.isEmpty ? 'Required' : null,
+                  // Validate the state value, not the FormField's own copy,
+                  // which goes stale when the AI fills the form.
+                  validator: (_) => _selectedHead.isEmpty ? 'Required' : null,
                 ),
                 const Gap(16),
                 if (ExpenseConstants.subHeads[_selectedHead] != null)
                   _buildDropdown(
-                    key: ValueKey('subhead_$_selectedHead'),
+                    // Keyed on the value too, so an AI-filled sub-head is shown
+                    // and validated even when the head did not change.
+                    key: ValueKey('subhead_${_selectedHead}_$_selectedSubHead'),
                     label: 'Sub Head',
                     value: _selectedSubHead,
                     items: ExpenseConstants.subHeads[_selectedHead]!,
-                    onChanged: (val) => setState(() => _selectedSubHead = val),
-                    validator: (val) =>
-                        val == null || val.isEmpty ? 'Required' : null,
+                    onChanged: (val) {
+                      setState(() => _selectedSubHead = val);
+                      _refreshRemark();
+                    },
+                    validator: (_) =>
+                        (_selectedSubHead == null || _selectedSubHead!.isEmpty)
+                        ? 'Required'
+                        : null,
                   ),
                 if (ExpenseConstants.subHeads[_selectedHead] != null)
                   const Gap(16),
@@ -470,7 +543,11 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                 const Gap(16),
                 TextFormField(
                   controller: _notesController,
-                  decoration: _inputDecoration('Notes (Optional)'),
+                  decoration: _inputDecoration('Notes (Optional)').copyWith(
+                    helperText: _remarkIsAuto
+                        ? 'Filled automatically from the details above'
+                        : null,
+                  ),
                   maxLines: 2,
                 ),
                 const Gap(16),
@@ -551,15 +628,31 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
     // Full width: screen horizontal padding 12*2=24
     final dropdownWidth = screenWidth - (AppDesign.screenHorizontalPadding * 2);
 
+    // Trip cities first, then every recognised Indian city for search.
+    final entries = <String>[...cities];
+    final seen = cities.map((c) => c.toLowerCase()).toSet();
+    for (final name in IndianCityResolver.allCityNames) {
+      if (seen.add(name.toLowerCase())) entries.add(name);
+    }
+    final hint = isFrom ? _fromCityHint : _toCityHint;
+    final controller = isFrom ? _cityController : _toCityController;
+
     return FormField<String>(
       validator: (_) {
-        final text = isFrom ? _cityController.text : _toCityController.text;
-        return text.trim().isEmpty ? 'Required' : null;
+        final text = controller.text.trim();
+        if (text.isEmpty) return 'Required';
+        if (!_isAcceptedCity(text, cities)) {
+          return 'Pick a city from the list';
+        }
+        return null;
       },
       builder: (state) {
         return DropdownMenu<String>(
           width: dropdownWidth,
-          controller: isFrom ? _cityController : _toCityController,
+          controller: controller,
+          helperText: hint != null && controller.text.trim().isEmpty
+              ? 'AI read "$hint" – not a recognised city. Please pick one.'
+              : null,
           label: Text(
             _selectedHead == 'Travel'
                 ? (isFrom ? 'From' : 'To')
@@ -599,6 +692,7 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
             state.didChange(newValue); // clear error on selection
             if (newValue != null) {
               if (isFrom) {
+                _fromCityHint = null;
                 _cityController.text = newValue;
                 // Copy From to To by default
                 if (_toCityController.text.isEmpty ||
@@ -606,12 +700,13 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
                   _toCityController.text = newValue;
                 }
               } else {
+                _toCityHint = null;
                 _toCityController.text = newValue;
               }
               setState(() {});
             }
           },
-          dropdownMenuEntries: cities
+          dropdownMenuEntries: entries
               .map(
                 (e) => DropdownMenuEntry<String>(
                   value: e,
@@ -625,6 +720,50 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
         );
       },
     );
+  }
+
+  /// A city is accepted when it is a recognised Indian city, one of the trip's
+  /// cities, or a name the user confirmed on save.
+  bool _isAcceptedCity(String text, List<String> tripCities) {
+    final lower = text.trim().toLowerCase();
+    return IndianCityResolver.canonicalName(text) != null ||
+        tripCities.any((c) => c.toLowerCase() == lower) ||
+        _confirmedUnknownCities.contains(lower);
+  }
+
+  /// Asks once per unrecognised city whether to keep it (e.g. a small town
+  /// that is not in the city list). Returns false if the user wants to fix it.
+  Future<bool> _confirmUnknownCities(List<String> tripCities) async {
+    final texts = <String>{
+      _cityController.text.trim(),
+      if (_selectedHead == 'Travel') _toCityController.text.trim(),
+    }..removeWhere((t) => t.isEmpty || _isAcceptedCity(t, tripCities));
+
+    for (final text in texts) {
+      if (!mounted) return false;
+      final keep = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Unrecognised city'),
+          content: Text(
+            '"$text" is not in the list of Indian cities. Use it anyway?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Change'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Use anyway'),
+            ),
+          ],
+        ),
+      );
+      if (keep != true) return false;
+      _confirmedUnknownCities.add(text.toLowerCase());
+    }
+    return true;
   }
 
   Widget _buildDropdown({
@@ -939,12 +1078,11 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
   }
 
   Future<void> _saveExpense() async {
+    final tripForCities = await _loadTrip();
+    if (!await _confirmUnknownCities(tripForCities?.cities ?? const [])) return;
+    if (!mounted) return;
     if (_formKey.currentState!.validate()) {
-      final tripsAsync = ref.read(tripListProvider);
-      final trip = tripsAsync.maybeWhen(
-        data: (trips) => trips.where((t) => t.id == widget.tripId).firstOrNull,
-        orElse: () => null,
-      );
+      final trip = tripForCities;
 
       if (trip != null) {
         // Compare only date parts
@@ -1023,10 +1161,9 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
         }
       }
 
-      final cityName = _cityController.text.trim();
-      final destinationName = _toCityController.text.isNotEmpty
-          ? _toCityController.text.trim()
-          : null;
+      // Store recognised cities in their canonical spelling.
+      final cityName = _displayCity(_cityController.text) ?? '';
+      final destinationName = _displayCity(_toCityController.text);
 
       // Ensure all bill paths are copied to persistent storage before saving
       final persistentBillPaths = await ImageUtils.copyToBillsDir(_billPaths);
@@ -1067,12 +1204,12 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
             e.startDate.month == expense.startDate.month &&
             e.startDate.day == expense.startDate.day;
 
-        final sameCity = e.city.trim().toLowerCase() ==
-            expense.city.trim().toLowerCase();
+        // Compare by canonical city so "New Delhi" and "Delhi (DEL)" match.
+        final sameCity = IndianCityResolver.comparisonKey(e.city) ==
+            IndianCityResolver.comparisonKey(expense.city);
 
-        final sameToCity =
-            (e.toCity ?? '').trim().toLowerCase() ==
-            (expense.toCity ?? '').trim().toLowerCase();
+        final sameToCity = IndianCityResolver.comparisonKey(e.toCity) ==
+            IndianCityResolver.comparisonKey(expense.toCity);
 
         return sameHead &&
             sameSubHead &&
