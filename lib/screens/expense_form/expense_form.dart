@@ -664,6 +664,12 @@ class _ExpenseFormScreenState extends ConsumerState<ExpenseFormScreen> {
           enableFilter: true,
           requestFocusOnTap: true,
           enableSearch: true,
+          // The list holds every Indian city, so keep the panel short enough
+          // to sit beside the keyboard and scroll within it.
+          menuHeight: (MediaQuery.sizeOf(context).height * 0.35).clamp(
+            200.0,
+            320.0,
+          ),
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
             fillColor: AppDesign.surfaceElevatedOf(context),
