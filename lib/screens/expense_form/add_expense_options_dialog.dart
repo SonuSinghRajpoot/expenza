@@ -5,8 +5,6 @@ import '../../providers/connectivity_provider.dart';
 import '../../providers/gemini_provider.dart';
 import '../../core/constants/expense_constants.dart';
 import '../../core/constants/expense_icons.dart';
-import '../../core/theme/app_icons.dart';
-import '../../core/theme/premium_icon.dart';
 import '../../core/theme/app_design.dart';
 import '../../core/theme/app_text_styles.dart';
 
@@ -356,17 +354,11 @@ class _AddExpenseOptionsDialogState extends ConsumerState<AddExpenseOptionsDialo
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            head == 'Event'
-                ? PremiumIcon(
-                    svgPath: AppIcons.square3Stack3d,
-                    size: 20,
-                    color: isSelected ? primaryColor : AppDesign.textSecondaryOf(context),
-                  )
-                : Icon(
-                    _getCategoryIcon(head),
-                    size: 20,
-                    color: isSelected ? primaryColor : AppDesign.textSecondaryOf(context),
-                  ),
+            Icon(
+              _getCategoryIcon(head),
+              size: 20,
+              color: isSelected ? primaryColor : AppDesign.textSecondaryOf(context),
+            ),
             const Gap(10),
             Text(
               head,
